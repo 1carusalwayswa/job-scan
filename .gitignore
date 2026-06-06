@@ -1,0 +1,22 @@
+# 个人策略真实文件（仅发 *.example.*）
+assets/profile.md
+assets/search_config.json
+assets/target_companies.json
+
+# 调度实例（仅发 *.example）
+deploy/*.plist
+deploy/systemd/*.service
+deploy/systemd/*.timer
+
+# 台账/渲染输出
+job-scan-results.jsonl
+job-scan-results.md
+job-scan-results.html
+applications-tracker.md
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+/tmp/
+*.tmp
