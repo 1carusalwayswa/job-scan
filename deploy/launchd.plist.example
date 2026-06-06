@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{{LABEL}}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{{SKILL_DIR}}/scripts/daily_scan.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>LANG</key>
+        <string>en_US.UTF-8</string>
+        <key>LC_ALL</key>
+        <string>en_US.UTF-8</string>
+        <key>JOB_SCAN_DIR</key>
+        <string>{{JOBDIR}}</string>
+    </dict>
+
+    <!-- 日志须放 ~/Library/Logs，不能放 ~/Documents（TCC 会拦，启动即 EX_CONFIG） -->
+    <key>StandardOutPath</key>
+    <string>{{LOG_DIR}}/job-scan.launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{LOG_DIR}}/job-scan.launchd.log</string>
+</dict>
+</plist>
