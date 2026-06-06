@@ -18,5 +18,7 @@ applications-tracker.md
 __pycache__/
 *.pyc
 .pytest_cache/
+.venv/
+venv/
 /tmp/
 *.tmp
