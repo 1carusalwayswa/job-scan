@@ -1,0 +1,7 @@
+{
+  "_comment": "复制为 assets/target_companies.json，换成你想盯的公司 career 页。Phase 1 step 2 会用 WebFetch 抓这些公开页补源。",
+  "companies": [
+    {"name": "Spotify", "careers_url": "https://www.lifeatspotify.com/jobs"},
+    {"name": "Klarna", "careers_url": "https://jobs.klarna.com/en/jobs"}
+  ]
+}

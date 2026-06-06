@@ -1,0 +1,14 @@
+{
+  "_comment": "复制为 assets/search_config.json 后改成你自己的赛道/阈值。occupation_field 是瑞典 JobTech 职业域公共码，apaJ_2ja_LuF = 数据/IT。municipality_ids 留空=全国，或填 JobTech taxonomy 的城市码。",
+  "occupation_field": "apaJ_2ja_LuF",
+  "municipality_ids": [],
+  "limit": 100,
+  "lanes": [
+    {"name": "Backend", "keywords": ["backend engineer", "integration engineer", "platform engineer", "systems engineer", "middleware"]},
+    {"name": "Data & ML", "keywords": ["machine learning engineer", "AI engineer", "data engineer", "MLOps", "LLM"]},
+    {"name": "DevOps / Platform", "keywords": ["devops engineer", "platform engineer", "SRE", "kubernetes", "infrastructure"]},
+    {"name": "Frontend", "keywords": ["frontend engineer", "react developer", "fullstack engineer", "typescript"]}
+  ],
+  "thresholds": {"Backend": 70, "Data & ML": 70, "DevOps / Platform": 70, "Frontend": 70},
+  "local_language": "Swedish"
+}
