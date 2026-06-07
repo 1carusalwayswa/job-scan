@@ -1,52 +1,52 @@
-# job-scan — 瑞典 IT 岗位发现 + 精筛 Claude Code 技能
+# job-scan — Swedish IT Job Discovery + Triage Claude Code Skill
 
-发现并精筛瑞典 IT/软件岗位：从 JobTech（Arbetsförmedlingen）API + 公司 career 公开页拉取，按你的画像与自定义赛道用 LLM 打分，按稳定链接去重，维护一个 jsonl 事实源并渲染 md/html 清单，高匹配标「待确认」等你拍板。
+Discover and triage Swedish IT/software jobs: pull from the JobTech (Arbetsförmedlingen) API plus companies' public career pages, score them against your profile and custom lanes with an LLM, dedup by stable link, maintain a jsonl source of truth, render md/html lists, and flag high matches as "to confirm" for your decision.
 
-> **本文件面向部署者/部署 agent**（怎么从 clone 到跑起来）。技能本身的用法在 `SKILL.md`。
+> **This file is for the deployer / deploying agent** (how to go from clone to running). The skill's own usage lives in `SKILL.md`.
 
-## 范围 / 限制
-- 数据源是**瑞典 JobTech**，只覆盖瑞典岗位；`occupation_field` 是瑞典职业分类码。
-- 这是一个可改造的**模板**：语言门槛、赛道、画像都来自配置；改 `local_language`/`lanes` 可适配你的情况，但数据源仍是瑞典。
-- LLM 打分在交互式会话里进行（用你的 Claude 订阅/额度）；每日 `daily_scan.sh` 只做零 token 的确定性流水线。
+## Scope / Limits
+- The data source is **Swedish JobTech**; it only covers Swedish jobs. `occupation_field` is a Swedish occupation-taxonomy code.
+- This is a reshapeable **template**: language gate, lanes, and profile all come from config. Editing `local_language`/`lanes` adapts it to your situation, but the data source is still Sweden.
+- LLM scoring happens in an interactive session (using your Claude subscription/quota); the daily `daily_scan.sh` runs only the zero-token deterministic pipeline.
 
-## 依赖
-- Python 3（仅标准库，无第三方包）。
-- Claude Code（作为技能加载）。
-- 网络可达 `jobsearch.api.jobtechdev.se`（无需 API key）。
+## Dependencies
+- Python 3 (standard library only, no third-party packages).
+- Claude Code (loaded as a skill).
+- Network access to `jobsearch.api.jobtechdev.se` (no API key required).
 
-## 安装
+## Install
 
-> 标注 **[agent 自动]** 的步骤部署 agent 可直接做；**[问用户]** 的须先向用户取信息。
+> Steps marked **[agent auto]** can be done directly by a deploying agent; **[ask user]** ones must first get info from the user.
 
-1. **[agent 自动]** 把本仓放进 Claude Code 技能目录（或在仓内直接当技能用）。确认 `SKILL.md` 能被发现。
-2. **[agent 自动]** 建配置真实文件：
+1. **[agent auto]** Put this repo into the Claude Code skills directory (or use it as a skill in place). Confirm `SKILL.md` is discoverable.
+2. **[agent auto]** Create the real config files:
    ```bash
    cp assets/profile.example.md         assets/profile.md
    cp assets/search_config.example.json assets/search_config.json
    cp assets/target_companies.example.json assets/target_companies.json
    ```
-   （这三个真实文件已在 `.gitignore`，不会被提交。）
-3. **[问用户]** 填 `assets/profile.md`：目标级别、所在地、**当地语言能力**（决定语言门槛是否排除）、核心技能、各赛道权重。
-4. **[问用户]** 改 `assets/search_config.json`：赛道 `lanes` 与阈值 `thresholds`、`local_language`（默认 Swedish）、可选 `municipality_ids`（城市码，留空=全国）。
-5. **[问用户，可选]** 改 `assets/target_companies.json` 为你想盯的公司 career 页。
-6. **[agent 可做，路径需用户确认]** 部署每日定时（可选）：见 `deploy/README.md`（macOS launchd / Linux systemd）。
+   (These three real files are already in `.gitignore` and won't be committed.)
+3. **[ask user]** Fill in `assets/profile.md`: target level, location, **local-language ability** (decides whether the language gate excludes a job), core skills, per-lane weights.
+4. **[ask user]** Edit `assets/search_config.json`: lanes and `thresholds`, `local_language` (default Swedish), optional `municipality_ids` (city codes; empty = nationwide).
+5. **[ask user, optional]** Edit `assets/target_companies.json` to the company career pages you want to watch.
+6. **[agent can do, path needs user confirmation]** Deploy the daily schedule (optional): see `deploy/README.md` (macOS launchd / Linux systemd).
 
-## 冒烟测试
+## Smoke Test
 
 ```bash
-# 主源拉取（写 /tmp/raw.jsonl）
+# Pull from the main source (writes /tmp/raw.jsonl)
 python3 scripts/fetch_jobtech.py --config assets/search_config.json --out /tmp/raw.jsonl
-# 并入事实源并渲染（首次 RESULTS 不存在会自动创建）
+# Merge into the source of truth and render (RESULTS is auto-created on first run)
 JOBDIR=${JOB_SCAN_DIR:-$HOME/job-scan}; mkdir -p "$JOBDIR"
 python3 scripts/results_io.py --mode merge --scored /dev/null --seen /tmp/raw.jsonl \
   --results "$JOBDIR/job-scan-results.jsonl" --md "$JOBDIR/job-scan-results.md" --today "$(date +%F)"
 python3 scripts/render_html.py --results "$JOBDIR/job-scan-results.jsonl" --out "$JOBDIR/job-scan-results.html"
-# 跑测试
-python3 -m pytest tests/ -v
+# Run the tests
+python3 -m pytest tests/ -v   # or: python3 -m unittest discover -s tests -t .
 ```
-预期：`$JOBDIR` 下生成 jsonl/md/html，pytest 全绿。
+Expected: jsonl/md/html are generated under `$JOBDIR`, and the test suite is all green.
 
-## 隐私守卫
-- 真实 `profile.md`/`search_config.json`/`target_companies.json`、台账输出、调度实例文件都已 `.gitignore`——**别强行 `git add` 它们**。
-- **别把含你台账/画像的副本推到公开仓**。要发布改动只发引擎与 `*.example.*`。
-- 投递历史 `applications-tracker.md`（若用）含个人数据，已忽略。
+## Privacy Guard
+- The real `profile.md`/`search_config.json`/`target_companies.json`, ledger outputs, and schedule instance files are all `.gitignore`d — **don't force `git add` them**.
+- **Don't push copies containing your ledger/profile to a public repo.** To publish changes, ship only the engine and the `*.example.*` files.
+- The application history `applications-tracker.md` (if used) contains personal data and is ignored.
