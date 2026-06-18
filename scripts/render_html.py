@@ -98,7 +98,7 @@ def render(src, out):
         risk_html = f'<div class="risk">⚠ {esc(" · ".join(risks))}</div>' if risks else ""
         btns = "".join(
             f'<button class="act" onclick="mark(this,\'{s}\')"{" disabled" if status == s else ""}>{label}</button>'
-            for s, label in (("待确认", "确认"), ("已看", "已看"), ("已忽略", "忽略"))
+            for s, label in (("已转apply", "Applied"), ("已看", "已看"), ("已忽略", "忽略"))
         )
         trs.append(f"""<tr data-link="{esc(link)}">
 <td class="num">{i}</td>
