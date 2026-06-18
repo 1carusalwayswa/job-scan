@@ -1,0 +1,16 @@
+{
+  "_comment": "国防/涉密机构黑名单：对中国公民有明确国籍或安全审查门槛，JD 即便没写信号词也默认排除。公司名按词边界子串匹配（小写）。只收明确涉密的国防机关与中央安全机构，普通 kommun/region/universitet 不入此名单（靠 signal 词按 JD 实写判断）。",
+  "company_patterns": [
+    "saab",
+    "försvarets radioanstalt",
+    "försvarets materielverk",
+    "försvarsmakten",
+    "säkerhetspolisen",
+    "statskontoret",
+    "totalförsvarets forskningsinstitut",
+    "fortifikationsverket",
+    "försvarshögskolan",
+    "myndigheten för samhällsskydd och beredskap"
+  ],
+  "gate_score": 8
+}

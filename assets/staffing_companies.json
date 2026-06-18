@@ -1,0 +1,23 @@
+{
+  "_comment": "招聘中介/bemanning 泛投名单（按法人名子串匹配，词边界）。打分规则对中介泛投封顶≤58、永远到不了 65 阈值，故 LLM 之前机械写 55 分。注意：工程咨询公司（Alten/AFRY/Capgemini/Knowit/Sigma/Syntronic/Combitech/Nexer AB/Intensogruppen 等，工程师为其正式员工）绝不入此名单——Alten 曾走到 HR 轮、Knowit 高分已投。Nexer Recruit（中介法人）在名单内但 Nexer AB（工程咨询）不在。Deploja 经用户 2026-06-11 确认不再投，入名单。",
+  "gate_score": 55,
+  "patterns": [
+    "academic work", "academic resource", "ada digital", "adding people",
+    "agil arbetskraft", "ants akademiskt", "a hub", "aveki", "avaron",
+    "barona", "bemannia", "bravura", "centio consulting", "clevry",
+    "2complete", "deploja", "digitalenta", "eccera", "ecrucial", "edza",
+    "eiss rekrytering", "emagine", "ework", "experis", "followu",
+    "framtiden i sverige", "friday väst", "friday öst", "futuria people",
+    "gazella", "gigstep", "hays", "head agent", "humanit", "hybrus",
+    "i-ray", "incluso", "jefferson wells", "jerrie", "job solution",
+    "jurek", "justera", "kraftsam", "lernia", "lynqa", "manpower",
+    "maxkompetens", "montico", "needo", "nexer recruit", "nikita",
+    "nxt interim", "oddwork", "onepartner", "poolia", "procruitment",
+    "professionals nord", "prowork", "qronos", "quattro bemanning",
+    "randstad", "riserank", "sjr in sweden", "skillhuset",
+    "skill kompetenspartner", "studentconsulting", "sway sourcing",
+    "talently", "tavana", "techrytera", "thalamus", "tng group",
+    "uniflex", "valora bemanning", "vendion", "veritaz", "weskill",
+    "wise it", "wrknest"
+  ]
+}
