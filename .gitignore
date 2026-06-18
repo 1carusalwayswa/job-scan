@@ -1,5 +1,6 @@
 # User-generated config (created by /job-scan setup)
 profile.md
+preferences.toml
 search_config.json
 target_companies.json
 
@@ -7,9 +8,6 @@ target_companies.json
 output/
 applications/
 calibration.jsonl
-
-# User config (TOML, not YAML — earlier design changed)
-preferences.toml
 
 # Python
 __pycache__/
