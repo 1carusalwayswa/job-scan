@@ -12,12 +12,13 @@ description: 瑞典 IT 岗位自动扫描 + 精筛工具。自动抓取 JobTech 
 - 用户配置：`profile.md`、`preferences.toml`、`search_config.json`、`target_companies.json`
 - 校准数据：`calibration.jsonl`
 
-所有路径相对于插件根目录（`PLUGIN_ROOT`，即包含 `.claude-plugin/` 的目录）。
+所有路径相对于插件根目录（`PLUGIN_ROOT`）。  
+定位方式：本 SKILL.md 位于 `PLUGIN_ROOT/skills/job-scan/`，因此 `PLUGIN_ROOT` = 本文件的祖父目录。
 
 ## 路径约定
 
 ```
-PLUGIN_ROOT = 插件根目录（含 .claude-plugin/、scripts/、assets/）
+PLUGIN_ROOT = 本 SKILL.md 所在目录的上两级（含 .claude-plugin/、scripts/、assets/）
 SCRIPTS     = PLUGIN_ROOT/scripts
 RESULTS     = PLUGIN_ROOT/output/job-scan-results.jsonl
 MD          = PLUGIN_ROOT/output/job-scan-results.md
