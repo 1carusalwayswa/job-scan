@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""job-scan-results.jsonl 事实源读写 + keyed merge + 渲染 .md。
+"""job-scan-results.jsonl fact-source read/write, keyed merge, and .md rendering.
 
-事实源按 link 主键存状态/分数/日期；.md 仅从事实源渲染供阅读。
-合并绝不把用户已设的状态降级回「新」（根治已忽略岗位重新冒头）。
+Fact source stores status/score/dates keyed by link; .md is rendered read-only.
+Merge never downgrades a user-set status back to 'new' (prevents ignored jobs
+from resurfacing).
 """
 import json
 import sys
 
-# 用户设过、机器不得擅自降级的状态
-USER_STATUSES = {"已看", "待确认", "已转apply", "已忽略"}
+# Statuses set by the user — machine must never downgrade these
+USER_STATUSES = {"reviewed", "shortlisted", "applied", "ignored"}
 
-MD_COLUMNS = ["发现日", "公司", "岗位", "地点", "赛道", "匹配分", "链接", "JD摘要", "状态"]
+MD_COLUMNS = ["First Seen", "Company", "Title", "Location", "Lane", "Score", "Link", "Summary", "Status"]
 
 
 def load_jsonl(path):
-    """读 jsonl 为 {link: job}。文件不存在返回空 dict。"""
+    """Read jsonl into {link: job}. Returns empty dict if file missing."""
     jobs = {}
     try:
         with open(path, encoding="utf-8") as f:
@@ -29,7 +30,7 @@ def load_jsonl(path):
 
 
 def save_jsonl(path, jobs):
-    """按匹配分降序写 jsonl。jobs 是 {link: job}。"""
+    """Write jsonl sorted by score descending. jobs is {link: job}."""
     ordered = sorted(jobs.values(), key=lambda j: j.get("score", 0), reverse=True)
     with open(path, "w", encoding="utf-8") as f:
         for job in ordered:
@@ -37,16 +38,16 @@ def save_jsonl(path, jobs):
 
 
 def filter_unscored(existing, raw):
-    """返回 raw 中 link 尚不在事实源里的岗位（仅这些需要 LLM 打分）。"""
+    """Return jobs from raw whose link is not yet in the fact source (need scoring)."""
     return [job for job in raw if job["link"] not in existing]
 
 
 def filter_pending(existing):
-    """返回台账里待精筛的岗位：无 score 且状态仍是「新」（未被用户处理）。
+    """Return jobs pending scoring: no score and status still 'new'.
 
-    每日无人值守脚本把新岗位以 status=新、无 score 并入台账；交互式精筛
-    据此捞出 backlog 打分。已被用户三选（已看/待确认/已转apply/已忽略）的
-    岗位即便无 score 也不再打扰。
+    The daily unattended script inserts new jobs with status='new' and no score.
+    Interactive scoring pulls this backlog. Jobs already triaged by the user
+    (reviewed/shortlisted/applied/ignored) are skipped even if unscored.
     """
     return [
         job for job in existing.values()
@@ -55,22 +56,23 @@ def filter_pending(existing):
 
 
 def merge(existing, scored, seen_links, today):
-    """把本批打分岗位按 link 合并进事实源。
+    """Merge scored jobs into fact source by link.
 
-    - 新 link → 插入，status=新，first_seen=last_seen=today。
-    - 已有 link 在 scored 里 → 更新 score/lane/reason/summary/last_seen，保留 status 与 first_seen。
-    - 已有 link 仅在 seen_links 里（本次源仍在但未重打分）→ 只刷新 last_seen。
-    - 已有 link 两处都不在 → 原样保留（不删，留痕）。
-    绝不把状态降级回「新」。
+    - New link -> insert with status='new', first_seen=last_seen=today.
+    - Existing link in scored -> update score/lane/reason/summary/last_seen,
+      preserve status and first_seen.
+    - Existing link only in seen_links -> refresh last_seen only.
+    - Existing link in neither -> keep as-is (never delete).
+    Never downgrade status back to 'new'.
     """
     merged = {link: dict(job) for link, job in existing.items()}
 
-    # 1) 本次源里仍出现的旧岗位：刷新 last_seen
+    # 1) Existing jobs still present in this fetch: refresh last_seen
     for link in seen_links:
         if link in merged:
             merged[link]["last_seen"] = today
 
-    # 2) 本批打分岗位：插入或更新（status/first_seen 一律保留，不降级）
+    # 2) Scored jobs: insert or update (always preserve status/first_seen)
     for job in scored:
         link = job["link"]
         if link in merged:
@@ -84,31 +86,31 @@ def merge(existing, scored, seen_links, today):
             new_job = dict(job)
             new_job["first_seen"] = today
             new_job["last_seen"] = today
-            new_job["status"] = "新"
+            new_job["status"] = "new"
             merged[link] = new_job
     return merged
 
 
 def sanitize(text):
-    """清洗自由文本，避免破坏 .md 表格：换行转空格、竖线转义。"""
+    """Sanitize free text for .md tables: newlines to spaces, escape pipes."""
     if not text:
         return ""
     return text.replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
 
 
 def render_md(jobs):
-    """从事实源渲染按匹配分降序的 Markdown 表格。jobs 是 {link: job}。"""
+    """Render fact source as a Markdown table sorted by score descending."""
     ordered = sorted(jobs.values(), key=lambda j: j.get("score", 0), reverse=True)
     lines = [
-        "# job-scan 候选清单",
+        "# job-scan Results",
         "",
-        "> 由 job-scan-results.jsonl 自动渲染，请勿手改；改状态请在对话里告诉 Claude。",
+        "> Auto-rendered from job-scan-results.jsonl. Do not edit manually; change status via Claude conversation.",
         "",
         "| " + " | ".join(MD_COLUMNS) + " |",
         "|" + "|".join(["---"] * len(MD_COLUMNS)) + "|",
     ]
     for job in ordered:
-        flag = " (疑似已投)" if job.get("maybe_applied") else ""
+        flag = " (maybe applied)" if job.get("maybe_applied") else ""
         row = [
             job.get("first_seen", ""),
             sanitize(job.get("company", "")),
@@ -125,7 +127,7 @@ def render_md(jobs):
 
 
 def set_status(jobs, link, status):
-    """按 link 改状态；link 不存在抛 KeyError。"""
+    """Set status by link; raises KeyError if link not found."""
     if link not in jobs:
         raise KeyError(link)
     jobs[link]["status"] = status
@@ -153,7 +155,7 @@ def main(argv=None):
     parser.add_argument("--link", nargs="+")
     parser.add_argument("--status")
     parser.add_argument("--include-pending", action="store_true",
-                        help="diff 模式下把事实源里未评分的 backlog 也并入输出（全新扫描不漏积压）")
+                        help="In diff mode, also include unscored backlog from fact source")
     args = parser.parse_args(argv)
 
     existing = load_jsonl(args.results)

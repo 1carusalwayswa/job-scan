@@ -1,24 +1,24 @@
 ---
 name: job-scan
-description: 瑞典 IT 岗位自动扫描 + 精筛工具。自动抓取 JobTech API + 目标公司 career page，按用户 profile 打分，支持 review server 手动查看。首次使用请跑 `/job-scan setup`。
+description: Automated IT job scanning + scoring tool for Sweden. Fetches from JobTech API + company career pages, scores against user profile, supports review server for manual review. First-time users run `/job-scan setup`.
 ---
 
 # job-scan
 
-瑞典 IT 岗位自动扫描 + LLM 精筛。
+Automated IT job scanning + LLM-powered scoring for Sweden.
 
-- 事实源：`output/job-scan-results.jsonl`（`link` 主键）
-- 可读清单：`output/job-scan-results.md` + `output/job-scan-results.html`
-- 用户配置：`profile.md`、`preferences.toml`、`search_config.json`、`target_companies.json`
-- 校准数据：`calibration.jsonl`
+- Fact source: `output/job-scan-results.jsonl` (primary key: `link`)
+- Human-readable: `output/job-scan-results.md` + `output/job-scan-results.html`
+- User config: `profile.md`, `preferences.toml`, `search_config.json`, `target_companies.json`
+- Calibration data: `calibration.jsonl`
 
-所有路径相对于插件根目录（`PLUGIN_ROOT`）。  
-定位方式：本 SKILL.md 位于 `PLUGIN_ROOT/skills/job-scan/`，因此 `PLUGIN_ROOT` = 本文件的祖父目录。
+All paths are relative to the plugin root directory (`PLUGIN_ROOT`).  
+This SKILL.md is located at `PLUGIN_ROOT/skills/job-scan/`, so `PLUGIN_ROOT` = grandparent of this file.
 
-## 路径约定
+## Path Conventions
 
 ```
-PLUGIN_ROOT = 本 SKILL.md 所在目录的上两级（含 .claude-plugin/、scripts/、assets/）
+PLUGIN_ROOT = Two levels above this SKILL.md (contains .claude-plugin/, scripts/, assets/)
 SCRIPTS     = PLUGIN_ROOT/scripts
 RESULTS     = PLUGIN_ROOT/output/job-scan-results.jsonl
 MD          = PLUGIN_ROOT/output/job-scan-results.md
@@ -29,102 +29,102 @@ PREFS       = PLUGIN_ROOT/preferences.toml
 CONFIG      = PLUGIN_ROOT/search_config.json
 COMPANIES   = PLUGIN_ROOT/target_companies.json
 CALIBRATION = PLUGIN_ROOT/calibration.jsonl
-TODAY       = 今天日期，ISO YYYY-MM-DD
+TODAY       = Today's date, ISO YYYY-MM-DD
 ```
 
-## 入口分流
+## Entry Point Routing
 
-| 用户说的 | 跑什么 |
+| User says | Action |
 |---|---|
-| `/job-scan setup` | Setup 流程 |
-| "精筛新岗 / 评分 / 看今天新增" | Phase 2 backlog 模式 |
-| "立刻全新扫描" | Phase 1 + Phase 2 全新模式 |
-| `/job-scan score-backlog` | Phase 2 backlog（unattended 模式，由 daily_scan.sh 调用） |
-| "确认/忽略/已看 第 N 个" | 状态变更 |
-| "投第 N 个 / 转 apply" | Phase 5 转 apply |
+| `/job-scan setup` | Setup flow |
+| "Score new jobs / review backlog" | Phase 2 backlog mode |
+| "Run a full scan now" | Phase 1 + Phase 2 full mode |
+| `/job-scan score-backlog` | Phase 2 backlog (unattended mode, called by daily_scan.sh) |
+| "Confirm / ignore / mark #N" | Status change |
+| "Apply to #N" | Phase 5 — prepare application |
 
-## Setup 流程（首次使用）
+## Setup Flow (First-Time Use)
 
-检查 `PLUGIN_ROOT/profile.md` 是否存在。如果不存在，进入 setup：
+Check if `PLUGIN_ROOT/profile.md` exists. If not, enter setup:
 
-1. **采集 profile**：交互式引导用户描述背景，生成 `profile.md`。需要涵盖：
-   - 基本信息（所在城市、学历、工作年限）
-   - 核心技术栈（experienced level）
-   - 了解但非专长的技术（working knowledge）
-   - 工作经历（每段：公司、职位、时间、关键成果）
-   - 教育亮点（论文、高分课程）
-   - 差异化信号（竞赛、开源、演讲等）
-   - 求职方向（目标角色类型、级别偏好、地点偏好）
+1. **Collect profile**: Interactively guide the user to describe their background, generating `profile.md`. Should cover:
+   - Basic info (location, education, years of experience)
+   - Core tech stack (experienced level)
+   - Technologies known but not expert in (working knowledge)
+   - Work experience (each: company, role, dates, key achievements)
+   - Education highlights (thesis, high-scoring courses)
+   - Differentiators (competitions, open source, talks, etc.)
+   - Job search direction (target role types, level preference, location preference)
 
-   参考 `templates/profile.example.md` 的结构。
+   Reference `templates/profile.example.md` for structure.
 
-2. **生成 preferences.toml**：根据用户回答生成。需要问：
-   - 瑞典语水平（fluent/basic/none）→ `language.swedish`
-   - 国籍/工作许可状况 → `eligibility.citizenship`、`eligibility.exclude_security_cleared`
-   - 每日扫描时间偏好 → `schedule.fetch_time`
-   - 是否开启自动打分 → `schedule.auto_score`
+2. **Generate preferences.toml**: Based on user answers. Ask about:
+   - Swedish proficiency (fluent/basic/none) → `language.swedish`
+   - Citizenship/work permit status → `eligibility.citizenship`, `eligibility.exclude_security_cleared`
+   - Preferred daily scan time → `schedule.fetch_time`
+   - Whether to enable auto-scoring → `schedule.auto_score`
 
-   参考 `templates/preferences.example.toml` 的结构。
+   Reference `templates/preferences.example.toml` for structure.
 
-3. **生成 search_config.json**：根据 profile 中的求职方向，帮用户定义搜索赛道。格式：
+3. **Generate search_config.json**: Based on career goals from profile, help define search lanes. Format:
    ```json
    {
      "occupation_field": "apaJ_2ja_LuF",
      "municipality_ids": [],
      "limit": 100,
      "lanes": [
-       {"name": "赛道名", "keywords": ["keyword1", "keyword2"]},
+       {"name": "Lane Name", "keywords": ["keyword1", "keyword2"]},
        ...
      ],
-     "thresholds": {"赛道名": 65, ...}
+     "thresholds": {"Lane Name": 65, ...}
    }
    ```
-   `occupation_field` 固定为 IT 领域 ID `apaJ_2ja_LuF`（JobTech taxonomy）。
-   每个 lane 对应用户的一个求职方向，keywords 用于 JobTech API 搜索。
+   `occupation_field` is fixed to IT sector ID `apaJ_2ja_LuF` (JobTech taxonomy).
+   Each lane corresponds to one of the user's career directions; keywords are used for JobTech API searches.
 
-4. **生成 target_companies.json**（可选）：用户感兴趣的公司列表，格式：
+4. **Generate target_companies.json** (optional): List of companies the user is interested in. Format:
    ```json
    {"companies": [{"name": "...", "careers_url": "...", "note": "..."}]}
    ```
-   用户可以跳过此步，后续手动添加。
+   User can skip this step and add companies later.
 
-5. **安装调度器**：
+5. **Install scheduler**:
    ```bash
-   bash PLUGIN_ROOT/scripts/setup_scheduler.sh
+   bash PLUGIN_ROOT/scripts/install_scheduler.sh
    ```
 
-6. Setup 完成后提示用户：
-   - "配置已生成。每日 {fetch_time} 自动抓取新岗位。"
-   - "现在可以跑 `/job-scan` 开始第一次扫描和评分。"
+6. After setup, prompt user:
+   - "Configuration complete. Daily auto-fetch set for {fetch_time}."
+   - "You can now run `/job-scan` to start your first scan and scoring."
 
-## Phase 1 — 拉取
+## Phase 1 — Fetch
 
-1. JobTech 主源：
+1. JobTech main source:
    ```bash
    python3 SCRIPTS/fetch_jobtech.py --config CONFIG --out /tmp/job-scan-raw.jsonl
    ```
-2. career 补源：读 `COMPANIES`（target_companies.json），对每个 `careers_url` 用 **WebFetch** 抓公开页，解析岗位追加到 `/tmp/job-scan-raw.jsonl`。格式：
-   - `link`：岗位详情页绝对 URL（稳定唯一）
-   - `company`/`title`/`location`/`summary`，`source` = `"career"`
-   - 某公司页抓取失败 → 跳过并记录，不中断。
+2. Career page supplement: Read `COMPANIES` (target_companies.json), use **WebFetch** on each `careers_url` to scrape public pages, append jobs to `/tmp/job-scan-raw.jsonl`. Format:
+   - `link`: Absolute URL to job detail page (stable, unique)
+   - `company`/`title`/`location`/`summary`, `source` = `"career"`
+   - If a company page fetch fails → skip and log, don't abort.
 
-## Phase 2 — 精筛打分
+## Phase 2 — Scoring
 
-**找出待打分岗位，二选一：**
+**Find jobs to score (choose one):**
 
-- **(A) backlog 模式（默认）**——每日 launchd/cron 已 fetch+去重+并入事实源，这里只捞未评分的：
+- **(A) Backlog mode (default)** — daily launchd/cron already fetched + deduped + merged into fact source. Just get unscored jobs:
   ```bash
   python3 SCRIPTS/results_io.py --mode pending --results RESULTS --out /tmp/job-scan-flagged.jsonl
   ```
 
-- **(B) 全新模式**——先跑 Phase 1，再 diff+去重：
+- **(B) Full mode** — run Phase 1 first, then diff + dedup:
   ```bash
   python3 SCRIPTS/results_io.py --mode diff --include-pending \
     --raw /tmp/job-scan-raw.jsonl --results RESULTS --out /tmp/job-scan-to-score.jsonl
   python3 SCRIPTS/dedup.py --in /tmp/job-scan-to-score.jsonl --tracker TRACKER --out /tmp/job-scan-flagged.jsonl
   ```
 
-**硬门槛（确定性，先于 LLM）**——根据 `preferences.toml` 的 gates 开关决定是否跑：
+**Deterministic gates (pre-LLM)** — controlled by gate toggles in `preferences.toml`:
 
 ```bash
 python3 SCRIPTS/lang_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan-flagged.jsonl
@@ -132,58 +132,58 @@ python3 SCRIPTS/citizenship_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/
 python3 SCRIPTS/pre_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan-flagged.jsonl
 ```
 
-**LLM 打分**：读 `PROFILE`，对 `/tmp/job-scan-flagged.jsonl` 中 **score 为空** 的岗位打分，写出 `/tmp/job-scan-scored.jsonl`。
+**LLM scoring**: Read `PROFILE`, score all jobs in `/tmp/job-scan-flagged.jsonl` that have **no score**, write `/tmp/job-scan-scored.jsonl`.
 
-### 评分方法论
+### Scoring Methodology
 
-**打分流程（对每个待评岗位）：**
+**Scoring flow (for each job to be scored):**
 
-1. **读 profile.md**，推断：
-   - 用户的核心栈及深度分层（experienced vs working knowledge）
-   - 工业经验年限和级别定位
-   - 差异化信号（竞赛、论文、特殊项目等）
-   - 各赛道的匹配强度
+1. **Read profile.md** and infer:
+   - User's core stack and depth tiers (experienced vs working knowledge)
+   - Years of industrial experience and target seniority level
+   - Differentiating signals (competitions, thesis, special projects, etc.)
+   - Match strength per lane
 
-2. **读 calibration.jsonl**（如存在），作为 few-shot 参考：每条含一个岗位的 link、原始打分、用户反馈、修正后分数。
+2. **Read calibration.jsonl** (if exists) as few-shot reference: each entry contains a job's link, original score, user feedback, and corrected score.
 
-3. **门控→封顶→分档**：
+3. **Gate → Cap → Tier**:
 
-   **缺口闸门（命中即封顶，取最低）：**
-   | 缺口 | 封顶 |
+   **Gap caps (hit = hard ceiling, take the lowest):**
+   | Gap | Cap |
    |---|---|
-   | JD 要 senior/lead/principal/staff 级别，或经验年限远超 profile | **≤50** |
-   | 缺 JD 的 must-have 核心栈（profile 无对应深度） | **≤55** |
-   | 中介泛投 / 咨询中介海量贴岗 | **≤58** |
+   | JD requires senior/lead/principal/staff level, or experience years far exceed profile | **≤50** |
+   | Missing JD's must-have core stack (profile lacks corresponding depth) | **≤55** |
+   | Staffing agency / mass-posted consulting intermediary | **≤58** |
 
-   **证据层级校验**：「用过/跑在其上」≠「实现/调试过」。JD 要求某栈的实现/集成排障深度时，profile 中应用层使用经验不算覆盖。
+   **Evidence-level verification**: "used it / ran on it" ≠ "built / debugged it". When JD requires implementation/integration/troubleshooting depth for a stack, application-layer usage experience in the profile does not count as coverage.
 
-   **分档锚点（封顶后对照）：**
-   - **80–90**：级别契合 + 核心栈覆盖 + 正中主力赛道 + 有差异化信号。四缺一即 <80。
-   - **70–79**：在赛道 + 核心栈覆盖较好，级别略偏或差异化一般。
-   - **60–69**：在赛道但有实质缺口。
-   - **<60**：多处缺口、中介泛投、或核心栈基本不符。
+   **Tier anchors (apply after capping):**
+   - **80–90**: Level fit + core stack coverage + direct lane match + differentiating signal. Missing any one → <80.
+   - **70–79**: In-lane + good core stack coverage, slight level mismatch or average differentiation.
+   - **60–69**: In-lane but material gaps.
+   - **<60**: Multiple gaps, staffing intermediary, or core stack fundamentally mismatched.
 
-4. **输出字段契约：**
-   - `score`：整数 0–100
-   - `lane`：必须是 `search_config.json` 的 `lanes[].name` 之一，或空串 `""`。不可自创变体。
-   - `reason`：一句话，**必须同时写命中与缺口**。
+4. **Output field contract:**
+   - `score`: Integer 0–100
+   - `lane`: Must be one of `search_config.json`'s `lanes[].name`, or empty string `""`. Do not invent variants.
+   - `reason`: One sentence, **must include both hits AND gaps**.
 
-5. **JD 语言信号**：JD 正文整篇用瑞典语写（即便没命中 lang_gate 的硬短语）→ 不排除但降 ~10 分，reason 注明。
+5. **JD language signal**: If JD is written entirely in Swedish (even without matching lang_gate hard phrases) → do not exclude, but deduct ~10 points and note in reason.
 
-6. **maybe_applied 信号**：`maybe_applied=true` 的岗位适当降分并在 reason 注明。
+6. **maybe_applied signal**: If `maybe_applied=true`, deduct slightly and note in reason.
 
-### Unattended 模式（score-backlog）
+### Unattended Mode (score-backlog)
 
-当由 `claude -p "/job-scan score-backlog"` 调用时：
+When invoked via `claude -p "/job-scan score-backlog"`:
 
-1. 走 backlog 模式 (A)，拿 pending 岗位
-2. 跑硬门槛 + LLM 打分
-3. merge + 渲染
-4. 高匹配岗直接标"待确认"
-5. **不启动 review server，不等待用户确认，不输出交互式摘要**
-6. 完成后静默退出
+1. Use backlog mode (A) to get pending jobs
+2. Run deterministic gates + LLM scoring
+3. Merge + render
+4. Mark high-match jobs for review
+5. **Do not start review server, do not wait for user confirmation, do not output interactive summary**
+6. Exit silently when done
 
-## Phase 3+4 — 合并 + 渲染
+## Phase 3+4 — Merge + Render
 
 ```bash
 python3 SCRIPTS/results_io.py --mode merge \
@@ -192,68 +192,68 @@ python3 SCRIPTS/results_io.py --mode merge \
   --results RESULTS --md MD --today TODAY
 ```
 
-backlog 模式省去 `--seen`。合并按 `link` 主键：新岗插入标「新」；已有岗保留用户状态、刷新 `last_seen`。
+Backlog mode omits `--seen`. Merge uses `link` as primary key: new jobs are inserted; existing jobs retain user status, refresh `last_seen`.
 
-**渲染：**
+**Render:**
 
 ```bash
 python3 SCRIPTS/render_html.py
 ```
 
-**交互式会话（非 unattended）：后台启动 review server：**
+**Interactive session (not unattended): start review server in background:**
 
 ```bash
-python3 SCRIPTS/review_server.py   # 自动开 http://localhost:8765
+python3 SCRIPTS/review_server.py   # opens http://localhost:8765
 ```
 
-然后列出本次新增的高匹配（score ≥ 各赛道 thresholds）摘要 + 链接 + 理由，等用户确认。把高匹配标"待确认"：
-
-```bash
-python3 SCRIPTS/results_io.py --mode status \
-  --results RESULTS --md MD --link "<链接>" --status "待确认"
-```
-
-## 状态变更
-
-用户说"确认/忽略/已看 第 N 个"时映射到 link：
+Then list high-match jobs (score ≥ lane thresholds) with summary + link + reason, and wait for user confirmation. Mark high-match jobs for review:
 
 ```bash
 python3 SCRIPTS/results_io.py --mode status \
-  --results RESULTS --md MD --link "<link>" --status "<待确认|已看|已忽略>"
+  --results RESULTS --md MD --link "<link>" --status "shortlisted"
 ```
 
-渲染后重新生成 HTML：`python3 SCRIPTS/render_html.py`
+## Status Changes
 
-## Phase 5 — 转 apply
+When user says "confirm / ignore / mark #N", map to link:
+
+```bash
+python3 SCRIPTS/results_io.py --mode status \
+  --results RESULTS --md MD --link "<link>" --status "<shortlisted|reviewed|ignored>"
+```
+
+Re-render HTML after status change: `python3 SCRIPTS/render_html.py`
+
+## Phase 5 — Prepare Application
 
 ```bash
 python3 SCRIPTS/prep_apply.py --list [--min-score N]
 python3 SCRIPTS/prep_apply.py --prep "<link1>" "<link2>" ...
 ```
 
-投递后置状态：
+After applying, set status:
 
 ```bash
 python3 SCRIPTS/results_io.py --mode status \
-  --results RESULTS --md MD --link "<link>" --status "已转apply"
+  --results RESULTS --md MD --link "<link>" --status "applied"
 ```
 
-## 反馈回路（校准）
+## Feedback Loop (Calibration)
 
-用户对某个打分说"这个给高了/低了"时，追加到 `CALIBRATION`：
+When a user says a score is too high or too low, append to `CALIBRATION`:
 
 ```json
-{"link": "...", "original_score": 78, "corrected_score": 55, "feedback": "核心栈不匹配，应触发 ≤55 封顶", "date": "2026-06-18"}
+{"link": "...", "original_score": 78, "corrected_score": 55, "feedback": "Core stack mismatch, should trigger ≤55 cap", "date": "2026-06-18"}
 ```
 
-下次 LLM 打分时读 `calibration.jsonl` 作为 few-shot 参考，持续提高打分精度。
+Next LLM scoring run reads `calibration.jsonl` as few-shot reference to continuously improve scoring accuracy.
 
-## 定时（自动配置）
+## Scheduling (Auto-Configured)
 
-`/job-scan setup` 会调用 `scripts/setup_scheduler.sh` 自动安装：
+`/job-scan setup` calls `scripts/install_scheduler.sh` to automatically install:
 - macOS: launchd plist (`~/Library/LaunchAgents/com.job-scan.daily.plist`)
 - Linux: crontab entry
 
-每日按 `preferences.toml` 的 `schedule.fetch_time` 执行 `scripts/daily_scan.sh`。
-若 `schedule.auto_score = true`，fetch 后自动调 `claude -p` 打分 pending 岗位。
-打分失败不影响 fetch 结果，pending 积累到下次。
+Runs `scripts/daily_scan.sh` daily at the time set in `preferences.toml` (`schedule.fetch_time`).
+If `schedule.auto_score = true`, auto-invokes `claude -p` to score pending jobs after fetch.
+Scoring failure does not affect fetch results; pending jobs accumulate until next run.

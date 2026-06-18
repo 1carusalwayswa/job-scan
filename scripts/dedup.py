@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""对照 applications-tracker.md 给岗位打「疑似已投」软标记（模糊兜底）。
+"""Soft-flag jobs as 'maybe_applied' by fuzzy-matching against applications-tracker.md.
 
-历史投递行没有链接，只能按品牌名 + 岗位标题模糊匹配。这是软提示，不硬删。
-硬去重由 results_io 按 link 主键合并完成。
+Historical applications lack links, so matching is by company name + job title.
+This is a soft hint, not a hard filter. Hard dedup is done by results_io via link key.
 """
 import json
 import sys
@@ -10,7 +10,7 @@ from difflib import SequenceMatcher
 
 
 def _col_index(cells, *labels):
-    """在表头单元格里找出某列下标（大小写无关），找不到返回 None。"""
+    """Find column index in header cells (case-insensitive). Returns None if not found."""
     lowered = [c.lower() for c in cells]
     for label in labels:
         if label in lowered:
@@ -19,10 +19,10 @@ def _col_index(cells, *labels):
 
 
 def parse_tracker(text):
-    """从 applications-tracker.md 表格里提取 {company, title} 行。
+    """Parse {company, title} rows from applications-tracker.md table.
 
-    按表头定位「公司」「岗位」两列的下标，再据此取数据行——既兼容真实的
-    date-first 表（投递日|公司|岗位|…），也兼容仅有 公司|岗位 的简表。
+    Locates company/title columns by header labels, supporting both
+    date-first tables (date|company|title|...) and simple company|title tables.
     """
     rows = []
     company_idx = title_idx = None
@@ -33,12 +33,12 @@ def parse_tracker(text):
         cells = [c.strip() for c in line.strip("|").split("|")]
         if len(cells) < 2:
             continue
-        if set("".join(cells)) <= set("-: "):  # 分隔行 ---
+        if set("".join(cells)) <= set("-: "):  # separator row ---
             continue
-        if company_idx is None:  # 尚未定位表头：本行须是表头
-            company_idx = _col_index(cells, "公司", "company")
-            title_idx = _col_index(cells, "岗位", "title")
-            continue  # 表头行不作数据
+        if company_idx is None:  # header not found yet: this line must be it
+            company_idx = _col_index(cells, "company")
+            title_idx = _col_index(cells, "title")
+            continue  # header row, not data
         if title_idx is None or max(company_idx, title_idx) >= len(cells):
             continue
         rows.append({"company": cells[company_idx], "title": cells[title_idx]})
@@ -46,18 +46,18 @@ def parse_tracker(text):
 
 
 def similar(a, b):
-    """大小写无关的相似度 [0,1]。"""
+    """Case-insensitive similarity ratio [0,1]."""
     return SequenceMatcher(None, (a or "").lower(), (b or "").lower()).ratio()
 
 
 def is_likely_applied(job, tracker_rows, threshold=0.8):
-    """岗位是否疑似已投。
+    """Check if a job was likely already applied to.
 
-    「已投」语义是同公司同岗位，故标题与公司须同时相似才判疑似：
-    标题相似度达阈值（默认 0.8）且公司略有重叠（>=0.5）。
-    公司用 >=0.5 的宽松线吸收品牌名 vs 瑞典法人名的差异
-    （如 "Coretura" vs "Coretura Sweden AB"），同时挡掉「不同公司、
-    相同通用标题」（如各家的 "Software Engineer"）的误报。
+    Requires both title and company to match: title similarity >= threshold
+    (default 0.8) and company similarity >= 0.5. The loose company threshold
+    absorbs brand-name vs Swedish legal-name differences (e.g. "Coretura" vs
+    "Coretura Sweden AB") while blocking false positives from different
+    companies with identical generic titles (e.g. "Software Engineer").
     """
     for row in tracker_rows:
         title_sim = similar(job.get("title", ""), row["title"])
@@ -68,7 +68,7 @@ def is_likely_applied(job, tracker_rows, threshold=0.8):
 
 
 def flag(jobs, tracker_text, threshold=0.8):
-    """给每个岗位加 maybe_applied 布尔标记，返回同一列表。"""
+    """Add maybe_applied boolean flag to each job, return same list."""
     rows = parse_tracker(tracker_text)
     for job in jobs:
         job["maybe_applied"] = is_likely_applied(job, rows, threshold)

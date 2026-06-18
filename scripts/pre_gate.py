@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""确定性公司/职业组预过滤（LLM 之前，零 token）。
+"""Deterministic company/occupation-group pre-filter (pre-LLM, zero tokens).
 
-两个门槛，与 lang_gate.py 同构（就地写 score，已有 score 的行跳过）：
+Two gates, same pattern as lang_gate.py (writes score in-place, skips already-scored):
 
-1. 中介泛投门槛：公司名命中 assets/staffing_companies.json 名单
-   → score 封顶 / staffing_gate=true。
+1. Staffing agency gate: company name matches assets/staffing_companies.json
+   -> score capped / staffing_gate=true.
 
-2. 职业组黑名单：JobTech 结构化 occupation_group 命中用户配置的排除列表
-   → score=18 / occupation_gate=true。
+2. Occupation group gate: JobTech occupation_group matches user-configured exclusion list
+   -> score=18 / occupation_gate=true.
 """
 import argparse
 import json
