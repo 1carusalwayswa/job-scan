@@ -55,10 +55,10 @@ def classify(company: str, summary: str, company_re):
     """返回 (命中?, 原因片段)。机构黑名单优先，其次信号词。"""
     m = company_re.search(company or "")
     if m:
-        return True, f"机构黑名单:「{m.group(0)}」"
+        return True, f"restricted employer: \"{m.group(0)}\""
     m = SIGNAL_RE.search(summary or "")
     if m:
-        return True, f"安审/国籍信号:「{m.group(0)}」"
+        return True, f"security clearance signal: \"{m.group(0)}\""
     return False, ""
 
 
@@ -82,16 +82,13 @@ def main(argv=None):
                 d["citizenship_gate"] = True
                 d["score"] = gate_score
                 d["lane"] = ""
-                d["reason"] = (
-                    f"国籍/安全审查硬门槛(机械门控:{frag})，"
-                    "排除——非瑞典/EU 公民无法通过安审"
-                )
+                d["reason"] = f"Citizenship/security gate: {frag}"
                 gated.append((d.get("company", ""), frag))
             rows.append(d)
 
     for c, frag in gated:
         print(f"  GATED  {c}  | {frag}", file=sys.stderr)
-    print(f"{len(gated)}/{len(rows)} 个被国籍/安审硬门槛拦截", file=sys.stderr)
+    print(f"{len(gated)}/{len(rows)} gated by citizenship/security requirement", file=sys.stderr)
 
     if not args.dry_run:
         with open(args.out, "w", encoding="utf-8") as f:
