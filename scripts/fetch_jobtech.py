@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""拉取 JobTech JobSearch API 并标准化为统一岗位字典。
+"""Fetch from JobTech JobSearch API and normalize into unified job dicts.
 
-铁律：绝不按英文公司名搜索。Platsbanken 用瑞典法人名，按公司名搜会漏。
-查询一律走 occupation-field + 双语关键词 + municipality。
+Never search by English company name — Platsbanken uses Swedish legal names,
+so company-name queries miss results. Always query via occupation-field +
+bilingual keywords + municipality.
 """
 import json
 import sys
@@ -15,11 +16,12 @@ API_URL = "https://jobsearch.api.jobtechdev.se/search"
 
 
 def build_queries(config):
-    """从 search_config.json 配置生成查询参数列表（每个关键词一组）。
+    """Generate query parameter dicts from search_config.json (one per keyword).
 
-    每个返回 dict 是 /search 的 query 参数，绝不包含公司名字段。
-    铁律：绝不把多个关键词拼成一个 q——JobTech 对多词 q 做整串相关性匹配
-    而非任一词命中，实测 6 词拼接命中 33 条 vs 单词 systemutvecklare 671 条。
+    Each returned dict maps to /search query params; never includes company name.
+    Never concatenate multiple keywords into one q — JobTech does full-phrase
+    relevance matching, so 6 concatenated words yield ~33 hits vs ~671 for a
+    single keyword like 'systemutvecklare'.
     """
     queries = []
     municipalities = config.get("municipality_ids", [])
@@ -37,12 +39,14 @@ def build_queries(config):
 
 
 def normalize_hit(hit):
-    """把一条 JobTech /search 命中标准化为统一岗位字典。
+    """Normalize one JobTech /search hit into a unified job dict.
 
-    link 取稳定的 webpage_url（缺失时用 id 构造），作为跨语言一致的去重主键。
-    保留两个结构化字段供确定性预过滤（pre_gate/lang_gate）使用：
-    occupation_group（雇主自报 SSYK 职业组，比标题正则可靠）、
-    must_have_languages（雇主结构化声明的语言硬要求，覆盖率 ~13% 但零猜测）。
+    Uses stable webpage_url as link (falls back to id-based URL) for
+    language-independent dedup. Preserves two structured fields for
+    deterministic pre-filtering (pre_gate/lang_gate):
+    occupation_group (employer-reported SSYK, more reliable than title regex),
+    must_have_languages (employer-declared hard language requirements, ~13%
+    coverage but zero guessing).
     """
     job_id = hit.get("id", "")
     link = hit.get("webpage_url") or f"https://arbetsformedlingen.se/ad/{job_id}"
@@ -65,7 +69,7 @@ def normalize_hit(hit):
 
 
 def _http_get_json(url, retries=3, backoff=2.0):
-    """GET JSON，对限流/5xx/网络抖动指数退避重试。"""
+    """GET JSON with exponential backoff retry on rate-limit/5xx/network errors."""
     for attempt in range(retries):
         try:
             req = urllib.request.Request(url, headers={"accept": "application/json"})
@@ -83,7 +87,7 @@ def _http_get_json(url, retries=3, backoff=2.0):
             raise
 
 
-# API 约束：offset+limit 不得超过 2000，超出部分只能放弃（命中数极少到这个量级）
+# API constraint: offset+limit must not exceed 2000; hits beyond that are dropped
 MAX_OFFSET = 1900
 
 

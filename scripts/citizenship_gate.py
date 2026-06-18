@@ -48,7 +48,9 @@ _MERIT_HEADER = re.compile(
 _REQ_HEADER = re.compile(
     r"\b(krav|requirements?|qualifications?|your\s+background|what\s+we\s+(expect|need)|"
     r"vad\s+vi\s+söker|vi\s+söker\s+dig|befattningen\s+kräver|annat\b|"
-    r"what\s+you\s+bring|who\s+you\s+are)\b",
+    r"what\s+you\s+bring|who\s+you\s+are|övrigt|vi\s+erbjuder|what\s+we\s+offer|"
+    r"ansökan|om\s+(tjänsten|rollen|uppdraget)|about\s+the\s+(role|position)|"
+    r"uppdragsinformation|startdatum)\b",
     re.IGNORECASE,
 )
 _EXEMPT_SAME_LINE = re.compile(
@@ -86,12 +88,18 @@ def _is_in_merit_context(summary: str, match_start: int, match_end: int) -> bool
     # 向后窗口逐行扫描：找最近的 merit 段标题，确认中间无 requirement 段标题
     window_start = max(0, match_start - 400)
     before_text = summary[window_start:match_start]
-    lines = before_text.split("\n")
     last_merit_pos = -1
     last_req_pos = -1
     offset = window_start
+    merit_line_start = re.compile(
+        r"^\s*(?:meriterande|(?:additional\s+)?merits?|nice\s+to\s+have|"
+        r"preferred\s+(?:qualif|skill)|desired\s+(?:qualif|skill)|"
+        r"bonus\s+(?:if|qualif)|plus\s+if\s+you|önskvärd)",
+        re.IGNORECASE,
+    )
     for line in before_text.split("\n"):
-        if _MERIT_HEADER.search(line):
+        stripped = line.strip()
+        if stripped and len(stripped) < 60 and merit_line_start.match(stripped):
             last_merit_pos = offset
         if _REQ_HEADER.search(line):
             last_req_pos = offset

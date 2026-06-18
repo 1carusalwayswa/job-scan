@@ -32,7 +32,7 @@ exclude_occupation_groups = [
 ]
 
 [scoring]
-# Score thresholds per lane — jobs scoring at or above are flagged as 待确认
+# Score thresholds per lane — jobs scoring at or above are flagged for review
 # Lane names must match exactly what LLM outputs (defined in search_config.json)
 # Example:
 # [scoring.thresholds]
