@@ -67,10 +67,15 @@ def risk_flags(r):
     return flags
 
 
+def _is_gated(r):
+    return any(r.get(g) for g in ("lang_gate", "citizenship_gate", "staffing_gate", "occupation_gate"))
+
+
 def render(src, out):
     all_rows = [json.loads(l) for l in open(src, encoding="utf-8") if l.strip()]
-    n_hidden = sum(1 for r in all_rows if r.get("status") == "已忽略")
-    rows = [r for r in all_rows if r.get("status") != "已忽略"]
+    n_ignored = sum(1 for r in all_rows if r.get("status") == "已忽略")
+    n_gated = sum(1 for r in all_rows if _is_gated(r))
+    rows = [r for r in all_rows if r.get("status") != "已忽略" and not _is_gated(r)]
     rows.sort(key=lambda r: r.get("score", 0) or 0, reverse=True)
 
     lane_colors = build_lane_colors(rows)
@@ -158,7 +163,8 @@ a {{ color:#2563eb; text-decoration:none; font-size:16px; }}
 <span class="stat"><b>{n_total}</b> 可见岗位</span>
 <span class="stat"><b>{n_scored}</b> 已评分</span>
 <span class="stat"><b>{n_pend}</b> 待确认</span>
-<span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_hidden}</b> 已忽略(已隐藏)</span>
+<span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_gated}</b> 门控过滤</span>
+<span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_ignored}</b> 已忽略</span>
 </div>
 <div class="controls">
 <button data-f="all" class="active" onclick="flt(this)">全部</button>
@@ -219,7 +225,7 @@ async function mark(btn,status){{
 
     with open(out, "w", encoding="utf-8") as f:
         f.write(doc)
-    print(f"wrote {out} ({n_total} rows, {n_pend} 待确认, {n_hidden} 已忽略隐藏)")
+    print(f"wrote {out} ({n_total} visible, {n_gated} gated, {n_ignored} ignored)")
 
 
 def main():
