@@ -43,9 +43,9 @@ The interactive setup will:
 ```
 
 In the conversation you can also:
-- "确认第 3 个" / "忽略第 5 个" — change job status
-- "投第 2 个" / "转 apply" — prepare application materials
-- "立刻全新扫描" — fetch + score from scratch
+- "Confirm #3" / "Ignore #5" — change job status
+- "Apply to #2" — prepare application materials
+- "Run a full scan now" — fetch + score from scratch
 
 ### Automated (daily via launchd/cron)
 

@@ -38,6 +38,24 @@ SIGNAL_PATTERNS = [
 ]
 SIGNAL_RE = re.compile("|".join(SIGNAL_PATTERNS), re.IGNORECASE)
 
+# 段标题豁免：信号出现在 merit/加分项段落下时，不算硬门槛。
+# 向后 400 字符内搜索 merit 段标题，同时确认中间无 requirement 段标题打断。
+_MERIT_HEADER = re.compile(
+    r"(additional\s+)?merits?\b|meriterande|nice\s+to\s+have|önskvärd|bonus\s+(if|qualif)|"
+    r"preferred\s+(qualif|skill)|desired\s+(qualif|skill)|fördel|plus\s+if\s+you",
+    re.IGNORECASE,
+)
+_REQ_HEADER = re.compile(
+    r"\b(krav|requirements?|qualifications?|your\s+background|what\s+we\s+(expect|need)|"
+    r"vad\s+vi\s+söker|vi\s+söker\s+dig|befattningen\s+kräver|annat\b|"
+    r"what\s+you\s+bring|who\s+you\s+are)\b",
+    re.IGNORECASE,
+)
+_EXEMPT_SAME_LINE = re.compile(
+    r"meriterande|is\s+a\s+plus|är\s+ett\s+plus|önskvärt|nice\s+to\s+have|(additional\s+)?merits?\b",
+    re.IGNORECASE,
+)
+
 GATE_SCORE = 8
 
 
@@ -51,14 +69,48 @@ def load_restricted(path=RESTRICTED_CONFIG):
     return pattern, cfg.get("gate_score", GATE_SCORE)
 
 
+def _is_in_merit_context(summary: str, match_start: int, match_end: int) -> bool:
+    """检查信号词是否在 merit/加分项上下文中。
+
+    策略：向后 400 字符窗口内逐行搜索 merit 段标题。
+    若找到且中间无 requirement 段标题打断，判定为 merit 上下文。
+    同行出现豁免词也判定为 merit 上下文。
+    """
+    # 同行豁免
+    nl_before = summary.rfind("\n", max(0, match_start - 80), match_start)
+    line_start = nl_before + 1 if nl_before != -1 else max(0, match_start - 80)
+    nl_after = summary.find("\n", match_end, min(len(summary), match_end + 80))
+    line_end = nl_after if nl_after != -1 else min(len(summary), match_end + 80)
+    if _EXEMPT_SAME_LINE.search(summary[line_start:line_end]):
+        return True
+    # 向后窗口逐行扫描：找最近的 merit 段标题，确认中间无 requirement 段标题
+    window_start = max(0, match_start - 400)
+    before_text = summary[window_start:match_start]
+    lines = before_text.split("\n")
+    last_merit_pos = -1
+    last_req_pos = -1
+    offset = window_start
+    for line in before_text.split("\n"):
+        if _MERIT_HEADER.search(line):
+            last_merit_pos = offset
+        if _REQ_HEADER.search(line):
+            last_req_pos = offset
+        offset += len(line) + 1
+    if last_merit_pos == -1:
+        return False
+    if last_req_pos > last_merit_pos:
+        return False
+    return True
+
+
 def classify(company: str, summary: str, company_re):
-    """返回 (命中?, 原因片段)。机构黑名单优先，其次信号词。"""
+    """返回 (命中?, 原因片段)。机构黑名单优先，其次信号词（merit 上下文豁免）。"""
     m = company_re.search(company or "")
     if m:
         return True, f"restricted employer: \"{m.group(0)}\""
-    m = SIGNAL_RE.search(summary or "")
-    if m:
-        return True, f"security clearance signal: \"{m.group(0)}\""
+    for m in SIGNAL_RE.finditer(summary or ""):
+        if not _is_in_merit_context(summary, m.start(), m.end()):
+            return True, f"security clearance signal: \"{m.group(0)}\""
     return False, ""
 
 
