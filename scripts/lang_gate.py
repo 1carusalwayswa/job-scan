@@ -43,45 +43,69 @@ EXEMPT_NEAR = re.compile(
     re.IGNORECASE,
 )
 
-# 段标题级豁免：bullet point 上方的 section header 若含这些词，该 section 下的硬短语不算门槛。
+# 段标题级豁免：向后 400 字符窗口搜索 merit 段标题，确认中间无 requirement 段标题打断。
 _MERIT_HEADER = re.compile(
     r"(additional\s+)?merits?\b|meriterande|nice\s+to\s+have|önskvärd|bonus\s+(if|qualif)|"
     r"preferred\s+(qualif|skill)|desired\s+(qualif|skill)|fördel|plus\s+if\s+you",
     re.IGNORECASE,
 )
+_REQ_HEADER = re.compile(
+    r"\b(krav|requirements?|qualifications?|your\s+background|what\s+we\s+(expect|need)|"
+    r"vad\s+vi\s+söker|vi\s+söker\s+dig|befattningen\s+kräver|annat\b|"
+    r"what\s+you\s+bring|who\s+you\s+are|övrigt|vi\s+erbjuder|what\s+we\s+offer|"
+    r"ansökan|om\s+(tjänsten|rollen|uppdraget)|about\s+the\s+(role|position)|"
+    r"uppdragsinformation|startdatum)\b",
+    re.IGNORECASE,
+)
 
-_BULLET_PREFIX = re.compile(r"^\s*[·\-\*•–]\s")
-
-WINDOW = 60  # 豁免词检测窗口（硬短语命中位置前后字符数）
+WINDOW = 60  # 同行豁免词检测窗口（硬短语命中位置前后字符数）
 
 GATE_SCORE = 8
 
 
-def _find_section_header(summary: str, pos: int) -> str:
-    """从 pos 往上扫，跳过 bullet 和空行，返回最近的段标题行（非 bullet 非空行）。"""
-    line_start = summary.rfind("\n", 0, pos)
-    cursor = line_start if line_start != -1 else 0
-    while cursor > 0:
-        prev_nl = summary.rfind("\n", 0, cursor)
-        seg_start = prev_nl + 1 if prev_nl != -1 else 0
-        line = summary[seg_start:cursor].strip()
-        cursor = seg_start
-        if not line:
-            continue
-        if _BULLET_PREFIX.match(line):
-            continue
-        return line
-    return ""
+_MERIT_LINE_START = re.compile(
+    r"^\s*(?:meriterande|(?:additional\s+)?merits?|nice\s+to\s+have|"
+    r"preferred\s+(?:qualif|skill)|desired\s+(?:qualif|skill)|"
+    r"bonus\s+(?:if|qualif)|plus\s+if\s+you|önskvärd)",
+    re.IGNORECASE,
+)
+
+
+def _line_is_merit_header(line: str) -> bool:
+    """判断一行是否是 merit 段标题。要求关键词出现在行首。"""
+    stripped = line.strip()
+    if not stripped or len(stripped) > 60:
+        return False
+    return bool(_MERIT_LINE_START.match(stripped))
+
+
+def _is_in_merit_section(summary: str, pos: int) -> bool:
+    """检查 pos 是否在 merit/加分项段落内。
+
+    向后 400 字符窗口逐行扫描，找最近的 merit 段标题行。
+    段标题行须同时满足：短（<50 字符）且含 merit 关键词。
+    若找到且中间无 requirement 段标题打断，返回 True。
+    """
+    window_start = max(0, pos - 400)
+    before_text = summary[window_start:pos]
+    last_merit_pos = -1
+    last_req_pos = -1
+    offset = window_start
+    for line in before_text.split("\n"):
+        if _line_is_merit_header(line):
+            last_merit_pos = offset
+        if _REQ_HEADER.search(line):
+            last_req_pos = offset
+        offset += len(line) + 1
+    return last_merit_pos != -1 and last_merit_pos > last_req_pos
 
 
 def is_swedish_hard_required(summary: str):
     """返回 (命中?, 命中的短语片段) 。命中处附近有豁免词则不算。
 
-    豁免上下文截断在换行处：豁免词须与硬短语同行（bullet 列表）才生效，
-    否则下一行的「Meriterande:」段落标题会落进窗口、把上一行的硬要求误豁免。
-
-    额外检查：向上扫描最近的段标题（跳过 bullet 和空行），若段标题含
-    merit/meriterande/nice-to-have 等词，视为加分项段落，不算硬门槛。
+    三层豁免：
+    1. 同行豁免（截断在换行处）：同行有 meriterande/plus/nice-to-have 等词
+    2. 段落豁免：向后 400 字符窗口内存在 merit 段标题且无 requirement 段标题打断
     """
     if not summary:
         return False, ""
@@ -99,8 +123,7 @@ def is_swedish_hard_required(summary: str):
                 ctx_end = nl_after
             if EXEMPT_NEAR.search(summary[ctx_start:ctx_end]):
                 continue
-            header = _find_section_header(summary, start)
-            if header and _MERIT_HEADER.search(header):
+            if _is_in_merit_section(summary, start):
                 continue
             return True, summary[start:end]
     return False, ""
