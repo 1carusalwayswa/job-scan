@@ -14,10 +14,10 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that fetc
 
 ```bash
 # Option 1: as a Claude Code plugin
-claude plugin install <repo-url>
+claude plugin install https://github.com/1carusalwayswa/job-scan
 
 # Option 2: manual
-git clone <repo-url> ~/.claude/plugins/job-scan
+git clone https://github.com/1carusalwayswa/job-scan ~/.claude/plugins/job-scan
 ```
 
 ## Quick Start
