@@ -92,16 +92,17 @@ MAX_OFFSET = 1900
 
 
 def fetch(config, http_get=_http_get_json):
-    """执行所有查询并分页翻完全部命中，返回按 link 去重的标准化岗位列表。
+    """Run all queries with full pagination, return link-deduped normalized jobs.
 
-    不分页只取前 100 时，总命中 >100 的关键词（如 systemutvecklare ~670 条）
-    会按相关性截断尾部，正是历史漏抓的主因之一。http_get 可注入以便测试。
+    Without pagination, keywords with >100 hits (e.g. systemutvecklare ~670)
+    get truncated by relevance — a past cause of missed jobs.
+    http_get is injectable for testing.
     """
     seen = {}
     for params in build_queries(config):
         offset = 0
         while offset <= MAX_OFFSET:
-            # municipality 是多值参数，doseq 展开
+            # municipality is a multi-value param; doseq expands it
             page_params = dict(params, offset=offset)
             url = API_URL + "?" + urllib.parse.urlencode(page_params, doseq=True)
             data = http_get(url)

@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""确定性国籍/安全审查硬门槛预过滤（LLM 之前，零 token）。
+"""Deterministic citizenship / security clearance pre-filter (pre-LLM, zero tokens).
 
-对非 EU 公民不可投的两类岗，机械降到 score=8 / citizenship_gate=true：
+Gates two categories of jobs that are inaccessible to non-EU citizens:
 
-1. 机构黑名单（assets/restricted_employers.json）：SAAB 及明确涉密的
-   国防机关 / 中央安全机构（FRA、FMV、Försvarsmakten、SÄPO、Statskontoret、
-   FOI…）。这些即便 JD 正文没写国籍/安审信号，按机构属性也默认有国籍要求。
-   依据：用户领域知识——「SAAB / 这种政府机关默认要求安全审查资格」。
+1. Restricted employer blocklist (assets/restricted_employers.json): SAAB and
+   confirmed defense/central-security agencies (FRA, FMV, Forsvarsmakten,
+   SAPO, Statskontoret, FOI, etc.) that inherently require Swedish citizenship.
 
-2. 信号词：JD 正文写明 säkerhetsprövning / säkerhetsskydd / säkerhetsklass /
-   svenskt medborgarskap / Swedish citizenship / security clearance 等
-   人员安全审查或公民权硬要求 → 非 EU 公民铁定过不了。
+2. Signal words: JD text contains terms like sakerhetsklassad, svenskt
+   medborgarskap, Swedish citizenship, security clearance, etc.
 
-与 lang_gate.py 同构：**无条件检测**（不看现有 score，故可全量回溯既有岗）。
-只匹配人员安审/公民权的特指术语，不碰 cybersäkerhet / informationssäkerhet
-这类信息安全泛指词。
+Unconditional check (ignores existing score) so it can retroactively gate
+previously scored jobs. Only matches personnel security / citizenship-specific
+terms; does not trigger on generic infosec terms like cybersakerhet.
 """
 import argparse
 import json
@@ -25,12 +23,10 @@ import sys
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESTRICTED_CONFIG = os.path.join(SKILL_DIR, "assets", "restricted_employers.json")
 
-# 人员安全审查 / 公民权硬要求的特指术语。小写匹配。
-# 注意 -prövning/-skydd/-klass 后缀是「人员安审」专用，不会误命中 cybersäkerhet。
 SIGNAL_PATTERNS = [
-    r"säkerhetspröv",                       # säkerhetsprövning/-as/-ad
-    r"säkerhetsskydd",                      # säkerhetsskyddslag(en)
-    r"säkerhetsklass",                      # placeras i säkerhetsklass / säkerhetsklassad
+    r"säkerhetspröv",
+    r"säkerhetsskydd",
+    r"säkerhetsklass",
     r"svenskt\s+medborgar(skap|e)",
     r"krav\s+på\s+(svenskt\s+)?medborgarskap",
     r"swedish\s+citizen(ship)?",
@@ -38,8 +34,6 @@ SIGNAL_PATTERNS = [
 ]
 SIGNAL_RE = re.compile("|".join(SIGNAL_PATTERNS), re.IGNORECASE)
 
-# 段标题豁免：信号出现在 merit/加分项段落下时，不算硬门槛。
-# 向后 400 字符内搜索 merit 段标题，同时确认中间无 requirement 段标题打断。
 _MERIT_HEADER = re.compile(
     r"(additional\s+)?merits?\b|meriterande|nice\s+to\s+have|önskvärd|bonus\s+(if|qualif)|"
     r"preferred\s+(qualif|skill)|desired\s+(qualif|skill)|fördel|plus\s+if\s+you",
@@ -72,20 +66,18 @@ def load_restricted(path=RESTRICTED_CONFIG):
 
 
 def _is_in_merit_context(summary: str, match_start: int, match_end: int) -> bool:
-    """检查信号词是否在 merit/加分项上下文中。
+    """Check if the signal word falls within a merit/nice-to-have section.
 
-    策略：向后 400 字符窗口内逐行搜索 merit 段标题。
-    若找到且中间无 requirement 段标题打断，判定为 merit 上下文。
-    同行出现豁免词也判定为 merit 上下文。
+    Scans backward 400 chars for a merit section header. If found and not
+    interrupted by a requirement section header, the signal is exempted.
+    Same-line exemption words also trigger exemption.
     """
-    # 同行豁免
     nl_before = summary.rfind("\n", max(0, match_start - 80), match_start)
     line_start = nl_before + 1 if nl_before != -1 else max(0, match_start - 80)
     nl_after = summary.find("\n", match_end, min(len(summary), match_end + 80))
     line_end = nl_after if nl_after != -1 else min(len(summary), match_end + 80)
     if _EXEMPT_SAME_LINE.search(summary[line_start:line_end]):
         return True
-    # 向后窗口逐行扫描：找最近的 merit 段标题，确认中间无 requirement 段标题
     window_start = max(0, match_start - 400)
     before_text = summary[window_start:match_start]
     last_merit_pos = -1
@@ -112,7 +104,7 @@ def _is_in_merit_context(summary: str, match_start: int, match_end: int) -> bool
 
 
 def classify(company: str, summary: str, company_re):
-    """返回 (命中?, 原因片段)。机构黑名单优先，其次信号词（merit 上下文豁免）。"""
+    """Return (hit, reason_fragment). Employer blocklist checked first, then signal words."""
     m = company_re.search(company or "")
     if m:
         return True, f"restricted employer: \"{m.group(0)}\""

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""本地 review server：在浏览器里一键标记岗位状态。
+"""Local review server: one-click job status updates in the browser.
 
-用法: python3 review_server.py
-GET /  → 重新渲染并返回 HTML
-POST /api/status {"link":..., "status":...} → 写事实源并重渲染
-闲置 60 分钟自动退出。
+Usage: python3 review_server.py
+GET /  -> re-render and serve HTML
+POST /api/status {"link":..., "status":...} -> update fact source and re-render
+Auto-exits after 60 minutes idle.
 """
 import http.server
 import json
@@ -21,7 +21,7 @@ from config import RESULTS, MD, HTML
 
 PORT = 8765
 IDLE_EXIT_SECONDS = 60 * 60
-ALLOWED_STATUSES = {"新", "待确认", "已看", "已忽略", "已转apply"}
+ALLOWED_STATUSES = {"new", "shortlisted", "reviewed", "ignored", "applied"}
 
 last_request = time.time()
 

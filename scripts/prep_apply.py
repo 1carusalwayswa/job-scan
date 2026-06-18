@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""prep_apply.py — 把候选岗整理成可投递的目录 + JD 原料文件。
+"""prep_apply.py -- Prepare application directories with JD summaries.
 
-用法:
-  prep_apply.py --list [--min-score N]      列出候选岗
-  prep_apply.py --prep LINK [LINK ...]      对选中岗建目录 + 写 job_summary.md
+Usage:
+  prep_apply.py --list [--min-score N]      List candidate jobs
+  prep_apply.py --prep LINK [LINK ...]      Create directories + write job_summary.md
 """
 import argparse
 import json
@@ -15,7 +15,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from config import RESULTS, REPO_ROOT
 
-SKIP_STATUS = {"已忽略", "已转apply"}
+SKIP_STATUS = {"ignored", "applied"}
 DEFAULT_MIN_SCORE = 70
 
 

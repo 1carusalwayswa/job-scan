@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""从 job-scan-results.jsonl 渲染可读 HTML 清单。
+"""Render a readable HTML dashboard from job-scan-results.jsonl.
 
-用法: python3 render_html.py [--src PATH] [--out PATH]
-默认从 config.py 读路径。
+Usage: python3 render_html.py [--src PATH] [--out PATH]
+Defaults to paths from config.py.
 """
 import argparse
 import datetime
@@ -21,9 +21,9 @@ PALETTE = [
 ]
 
 STATUS_BADGE = {
-    "待确认": ("#b45309", "#fef3c7"), "已看": ("#374151", "#e5e7eb"),
-    "已转apply": ("#065f46", "#d1fae5"), "已忽略": ("#991b1b", "#fee2e2"),
-    "新": ("#1e40af", "#dbeafe"),
+    "shortlisted": ("#b45309", "#fef3c7"), "reviewed": ("#374151", "#e5e7eb"),
+    "applied": ("#065f46", "#d1fae5"), "ignored": ("#991b1b", "#fee2e2"),
+    "new": ("#1e40af", "#dbeafe"),
 }
 
 
@@ -56,14 +56,14 @@ def risk_flags(r):
         "swedish work permit", "valid work permit", "right to work in sweden",
         "work permit in sweden", "eu/eea citizenship", "eu / eea citizenship",
     )):
-        flags.append("需公民/工签资格")
+        flags.append("Citizenship/permit required")
     if any(k in sl for k in (
         "security clearance", "security vetting", "säkerhetsprövning",
         "säkerhetsklass",
     )):
-        flags.append("需安全审查")
+        flags.append("Security clearance")
     if r.get("lang_gate") is True:
-        flags.append("需瑞典语")
+        flags.append("Swedish required")
     return flags
 
 
@@ -73,14 +73,14 @@ def _is_gated(r):
 
 def render(src, out):
     all_rows = [json.loads(l) for l in open(src, encoding="utf-8") if l.strip()]
-    n_ignored = sum(1 for r in all_rows if r.get("status") == "已忽略")
+    n_ignored = sum(1 for r in all_rows if r.get("status") == "ignored")
     n_gated = sum(1 for r in all_rows if _is_gated(r))
-    rows = [r for r in all_rows if r.get("status") != "已忽略" and not _is_gated(r)]
+    rows = [r for r in all_rows if r.get("status") != "ignored" and not _is_gated(r)]
     rows.sort(key=lambda r: r.get("score", 0) or 0, reverse=True)
 
     lane_colors = build_lane_colors(rows)
     n_total = len(rows)
-    n_pend = sum(1 for r in rows if r.get("status") == "待确认")
+    n_pend = sum(1 for r in rows if r.get("status") == "shortlisted")
     n_scored = sum(1 for r in rows if r.get("score"))
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -92,13 +92,13 @@ def render(src, out):
         status = r.get("status", "")
         sfg, sbg = STATUS_BADGE.get(status, ("#374151", "#e5e7eb"))
         loc = r.get("location") or ""
-        applied = ' <span class="flag">疑似已投</span>' if r.get("maybe_applied") else ""
+        applied = ' <span class="flag">maybe applied</span>' if r.get("maybe_applied") else ""
         link = r.get("link", "")
         risks = risk_flags(r)
         risk_html = f'<div class="risk">⚠ {esc(" · ".join(risks))}</div>' if risks else ""
         btns = "".join(
             f'<button class="act" onclick="mark(this,\'{s}\')"{" disabled" if status == s else ""}>{label}</button>'
-            for s, label in (("已转apply", "Applied"), ("已看", "已看"), ("已忽略", "忽略"))
+            for s, label in (("applied", "Applied"), ("reviewed", "Reviewed"), ("ignored", "Ignore"))
         )
         trs.append(f"""<tr data-link="{esc(link)}">
 <td class="num">{i}</td>
@@ -114,16 +114,16 @@ def render(src, out):
 </tr>""")
 
     status_color_json = json.dumps(
-        {k: list(v) for k, v in STATUS_BADGE.items() if k != "已忽略"},
+        {k: list(v) for k, v in STATUS_BADGE.items() if k != "ignored"},
         ensure_ascii=False,
     )
 
     doc = f"""<!DOCTYPE html>
-<html lang="zh"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>job-scan 候选清单</title>
+<title>job-scan Results</title>
 <style>
-:root {{ font-family: -apple-system, "PingFang SC", "Segoe UI", sans-serif; }}
+:root {{ font-family: -apple-system, "Segoe UI", sans-serif; }}
 body {{ margin:0; background:#f8fafc; color:#1e293b; }}
 header {{ padding:24px 32px 12px; background:#fff; border-bottom:1px solid #e2e8f0; position:sticky; top:0; z-index:10; }}
 h1 {{ margin:0 0 6px; font-size:24px; }}
@@ -157,24 +157,24 @@ a {{ color:#2563eb; text-decoration:none; font-size:16px; }}
 </style></head>
 <body>
 <header>
-<h1>job-scan 候选清单</h1>
-<div class="meta">生成于 {now} · 一键标记请用 review server</div>
+<h1>job-scan Results</h1>
+<div class="meta">Generated {now} · Use review server for one-click status updates</div>
 <div class="stats">
-<span class="stat"><b>{n_total}</b> 可见岗位</span>
-<span class="stat"><b>{n_scored}</b> 已评分</span>
-<span class="stat"><b>{n_pend}</b> 待确认</span>
-<span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_gated}</b> 门控过滤</span>
-<span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_ignored}</b> 已忽略</span>
+<span class="stat"><b>{n_total}</b> visible</span>
+<span class="stat"><b>{n_scored}</b> scored</span>
+<span class="stat"><b>{n_pend}</b> shortlisted</span>
+<span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_gated}</b> gated</span>
+<span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_ignored}</b> ignored</span>
 </div>
 <div class="controls">
-<button data-f="all" class="active" onclick="flt(this)">全部</button>
-<button data-f="待确认" onclick="flt(this)">待确认</button>
-<button data-f="hi" onclick="flt(this)">≥70 分</button>
+<button data-f="all" class="active" onclick="flt(this)">All</button>
+<button data-f="shortlisted" onclick="flt(this)">Shortlisted</button>
+<button data-f="hi" onclick="flt(this)">≥70 pts</button>
 </div>
 </header>
 <div class="wrap">
 <table id="t">
-<thead><tr><th>#</th><th>分</th><th>赛道</th><th>公司</th><th>岗位</th><th>地点</th><th>理由</th><th>状态</th><th>链</th><th>操作</th></tr></thead>
+<thead><tr><th>#</th><th>Score</th><th>Lane</th><th>Company</th><th>Title</th><th>Location</th><th>Reason</th><th>Status</th><th>Link</th><th>Actions</th></tr></thead>
 <tbody>
 {''.join(trs)}
 </tbody>
@@ -189,7 +189,7 @@ function flt(btn){{
     const score=parseInt(tr.children[1].textContent)||0;
     const status=tr.children[7].textContent;
     let show=true;
-    if(f==='待确认') show=status.includes('待确认');
+    if(f==='shortlisted') show=status.includes('shortlisted');
     else if(f==='hi') show=score>=70;
     tr.style.display=show?'':'none';
   }});
@@ -203,21 +203,21 @@ function toast(msg){{
 async function mark(btn,status){{
   const tr=btn.closest('tr'), link=tr.dataset.link;
   if(location.protocol==='file:'){{
-    toast('file:// 模式无法直接写入 — 请用 review server 打开');
+    toast('file:// mode cannot write — open via review server instead');
     return;
   }}
   btn.disabled=true;
   try{{
     const res=await fetch('/api/status',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{link,status}})}});
     if(!res.ok) throw new Error(await res.text());
-    if(status==='已忽略'){{ tr.style.opacity='.3'; setTimeout(()=>tr.remove(),300); toast('已忽略'); return; }}
+    if(status==='ignored'){{ tr.style.opacity='.3'; setTimeout(()=>tr.remove(),300); toast('Ignored'); return; }}
     const badge=tr.querySelector('.status');
     badge.textContent=status;
     const [fg,bg]=STATUS_COLOR[status]||["#374151","#e5e7eb"];
     badge.style.color=fg; badge.style.background=bg;
-    tr.querySelectorAll('.act').forEach(b=>b.disabled=(b.textContent===(status==='待确认'?'确认':status)));
-    toast('已标记：'+status);
-  }}catch(e){{ btn.disabled=false; toast('失败：'+e.message); }}
+    tr.querySelectorAll('.act').forEach(b=>b.disabled=(b.textContent.toLowerCase()===status));
+    toast('Marked: '+status);
+  }}catch(e){{ btn.disabled=false; toast('Failed: '+e.message); }}
 }}
 </script>
 <div id="toast"></div>
