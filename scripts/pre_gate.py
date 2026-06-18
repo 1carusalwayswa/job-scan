@@ -72,13 +72,13 @@ def main(argv=None):
                 d["staffing_gate"] = True
                 d["score"] = staffing_score_cap
                 d["lane"] = ""
-                d["reason"] = f"中介泛投(机械门控:「{company.strip()}」在 bemanning 名单)"
+                d["reason"] = f"Staffing agency gate: \"{company.strip()}\" matched bemanning list"
                 n_staff += 1
             elif group and any(b in group for b in occ_lower):
                 d["occupation_gate"] = True
                 d["score"] = OCCUPATION_GATE_SCORE
                 d["lane"] = ""
-                d["reason"] = f"职业组为「{d['occupation_group']}」(排除类职业组，机械门控)"
+                d["reason"] = f"Occupation group gate: \"{d['occupation_group']}\" is in exclusion list"
                 n_occ += 1
 
     print(f"{n_staff} staffing-gated, {n_occ} occupation-gated (of {len(rows)})", file=sys.stderr)

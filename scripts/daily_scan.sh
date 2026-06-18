@@ -90,6 +90,8 @@ if [ "$AUTO_SCORE" = "true" ] && [ "$PENDING_COUNT" -gt 0 ] && command -v claude
     # permission settings to allow Bash and Read tools without prompting,
     # or run with appropriate flags. See setup instructions.
     if claude -p "/job-scan score-backlog" \
+        --plugin-dir "$REPO_DIR" \
+        --add-dir "$REPO_DIR" \
         --allowedTools "Bash,Read,Write,Skill" \
         --max-budget-usd "$MAX_BUDGET" \
         >>"$RUNLOG" 2>&1; then

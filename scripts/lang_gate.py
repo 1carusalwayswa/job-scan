@@ -99,13 +99,13 @@ def main(argv=None):
                 d["lang_gate"] = True
                 d["score"] = GATE_SCORE
                 # lane 是赛道维度，不用「已忽略」这类状态值污染；门控岗 lane 保持原样/留空
-                d["reason"] = f"瑞典语硬要求(机械门控:「{frag}」)，排除——无瑞典语工作能力"
+                d["reason"] = f"Swedish language gate: hard requirement detected (\"{frag}\")"
                 gated.append((d.get("company", ""), frag))
             rows.append(d)
 
     for c, frag in gated:
         print(f"  GATED  {c}  | {frag}", file=sys.stderr)
-    print(f"{len(gated)}/{len(rows)} 个被瑞典语硬门槛拦截", file=sys.stderr)
+    print(f"{len(gated)}/{len(rows)} gated by Swedish language requirement", file=sys.stderr)
 
     if not args.dry_run:
         with open(args.out, "w", encoding="utf-8") as f:
