@@ -38,13 +38,40 @@ HARD_PATTERNS = [
 # 豁免语境：硬短语命中处附近若含这些词，视为「加分项/雇佣条款/机构名」，不算硬门槛。
 EXEMPT_NEAR = re.compile(
     r"meriterande|är\s+ett\s+plus|is\s+a\s+plus|önskvärt|fördel|nice\s+to\s+have|"
-    r"collective\s+agreement|kollektivavtal|or\s+english|eller\s+engelska|swedish\s+(university|company|market)",
+    r"collective\s+agreement|kollektivavtal|or\s+english|eller\s+engelska|swedish\s+(university|company|market)|"
+    r"(additional\s+)?merits?\b",
     re.IGNORECASE,
 )
+
+# 段标题级豁免：bullet point 上方的 section header 若含这些词，该 section 下的硬短语不算门槛。
+_MERIT_HEADER = re.compile(
+    r"(additional\s+)?merits?\b|meriterande|nice\s+to\s+have|önskvärd|bonus\s+(if|qualif)|"
+    r"preferred\s+(qualif|skill)|desired\s+(qualif|skill)|fördel|plus\s+if\s+you",
+    re.IGNORECASE,
+)
+
+_BULLET_PREFIX = re.compile(r"^\s*[·\-\*•–]\s")
 
 WINDOW = 60  # 豁免词检测窗口（硬短语命中位置前后字符数）
 
 GATE_SCORE = 8
+
+
+def _find_section_header(summary: str, pos: int) -> str:
+    """从 pos 往上扫，跳过 bullet 和空行，返回最近的段标题行（非 bullet 非空行）。"""
+    line_start = summary.rfind("\n", 0, pos)
+    cursor = line_start if line_start != -1 else 0
+    while cursor > 0:
+        prev_nl = summary.rfind("\n", 0, cursor)
+        seg_start = prev_nl + 1 if prev_nl != -1 else 0
+        line = summary[seg_start:cursor].strip()
+        cursor = seg_start
+        if not line:
+            continue
+        if _BULLET_PREFIX.match(line):
+            continue
+        return line
+    return ""
 
 
 def is_swedish_hard_required(summary: str):
@@ -52,6 +79,9 @@ def is_swedish_hard_required(summary: str):
 
     豁免上下文截断在换行处：豁免词须与硬短语同行（bullet 列表）才生效，
     否则下一行的「Meriterande:」段落标题会落进窗口、把上一行的硬要求误豁免。
+
+    额外检查：向上扫描最近的段标题（跳过 bullet 和空行），若段标题含
+    merit/meriterande/nice-to-have 等词，视为加分项段落，不算硬门槛。
     """
     if not summary:
         return False, ""
@@ -68,6 +98,9 @@ def is_swedish_hard_required(summary: str):
             if nl_after != -1:
                 ctx_end = nl_after
             if EXEMPT_NEAR.search(summary[ctx_start:ctx_end]):
+                continue
+            header = _find_section_header(summary, start)
+            if header and _MERIT_HEADER.search(header):
                 continue
             return True, summary[start:end]
     return False, ""
