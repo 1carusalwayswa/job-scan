@@ -11,7 +11,7 @@ import json
 import os
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from config import RESULTS, HTML
 
@@ -22,8 +22,8 @@ PALETTE = [
 
 STATUS_BADGE = {
     "shortlisted": ("#b45309", "#fef3c7"), "reviewed": ("#374151", "#e5e7eb"),
-    "applied": ("#065f46", "#d1fae5"), "ignored": ("#991b1b", "#fee2e2"),
-    "new": ("#1e40af", "#dbeafe"),
+    "applied": ("#065f46", "#d1fae5"), "rejected": ("#7f1d1d", "#fecaca"),
+    "ignored": ("#991b1b", "#fee2e2"), "new": ("#1e40af", "#dbeafe"),
 }
 
 
@@ -81,6 +81,7 @@ def render(src, out):
     lane_colors = build_lane_colors(rows)
     n_total = len(rows)
     n_pend = sum(1 for r in rows if r.get("status") == "shortlisted")
+    n_unprocessed = sum(1 for r in rows if r.get("status", "") in ("", "new"))
     n_scored = sum(1 for r in rows if r.get("score"))
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -98,7 +99,7 @@ def render(src, out):
         risk_html = f'<div class="risk">⚠ {esc(" · ".join(risks))}</div>' if risks else ""
         btns = "".join(
             f'<button class="act" onclick="mark(this,\'{s}\')"{" disabled" if status == s else ""}>{label}</button>'
-            for s, label in (("applied", "Applied"), ("reviewed", "Reviewed"), ("ignored", "Ignore"))
+            for s, label in (("applied", "Applied"), ("rejected", "Rejected"), ("reviewed", "Reviewed"), ("ignored", "Ignore"))
         )
         trs.append(f"""<tr data-link="{esc(link)}">
 <td class="num">{i}</td>
@@ -163,12 +164,14 @@ a {{ color:#2563eb; text-decoration:none; font-size:16px; }}
 <span class="stat"><b>{n_total}</b> visible</span>
 <span class="stat"><b>{n_scored}</b> scored</span>
 <span class="stat"><b>{n_pend}</b> shortlisted</span>
+<span class="stat"><b>{n_unprocessed}</b> unprocessed</span>
 <span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_gated}</b> gated</span>
 <span class="stat" style="color:#94a3b8"><b style="color:#94a3b8">{n_ignored}</b> ignored</span>
 </div>
 <div class="controls">
 <button data-f="all" class="active" onclick="flt(this)">All</button>
 <button data-f="shortlisted" onclick="flt(this)">Shortlisted</button>
+<button data-f="unprocessed" onclick="flt(this)">未处理</button>
 <button data-f="hi" onclick="flt(this)">≥70 pts</button>
 </div>
 </header>
@@ -190,6 +193,7 @@ function flt(btn){{
     const status=tr.children[7].textContent;
     let show=true;
     if(f==='shortlisted') show=status.includes('shortlisted');
+    else if(f==='unprocessed') show=!status||status==='new';
     else if(f==='hi') show=score>=70;
     tr.style.display=show?'':'none';
   }});

@@ -18,7 +18,7 @@ This SKILL.md is located at `PLUGIN_ROOT/skills/job-scan/`, so `PLUGIN_ROOT` = g
 ## Path Conventions
 
 ```
-PLUGIN_ROOT = Two levels above this SKILL.md (contains .claude-plugin/, scripts/, assets/)
+PLUGIN_ROOT = Two levels above this SKILL.md (contains scripts/, assets/)
 SCRIPTS     = PLUGIN_ROOT/scripts
 RESULTS     = PLUGIN_ROOT/output/job-scan-results.jsonl
 MD          = PLUGIN_ROOT/output/job-scan-results.md
@@ -130,6 +130,7 @@ Check if `PLUGIN_ROOT/profile.md` exists. If not, enter setup:
 python3 SCRIPTS/lang_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan-flagged.jsonl
 python3 SCRIPTS/citizenship_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan-flagged.jsonl
 python3 SCRIPTS/pre_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan-flagged.jsonl
+python3 SCRIPTS/profile_gap_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan-flagged.jsonl
 ```
 
 **LLM scoring**: Read `PROFILE`, score all jobs in `/tmp/job-scan-flagged.jsonl` that have **no score**, write `/tmp/job-scan-scored.jsonl`.
@@ -146,12 +147,21 @@ python3 SCRIPTS/pre_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan
 
 2. **Read calibration.jsonl** (if exists) as few-shot reference: each entry contains a job's link, original score, user feedback, and corrected score.
 
-3. **Gate → Cap → Tier**:
+3. **Pre-scoring checklist (answer each before assigning score):**
+   - [ ] Is the company a staffing/consulting intermediary? → cap ≤58
+   - [ ] Does the JD require tool stacks the profile completely lacks? → check profile_gap_gate flags
+   - [ ] Does the JD require deep expertise the profile only touches superficially? → cap ≤55
+   - [ ] Is the JD title Senior/Staff/Lead/Principal or does JD expect lead-level ownership? → cap ≤50
+   - [ ] Is the JD entirely in Swedish? → deduct ~10 points
+   - [ ] Does the job have any `*_gate=true` flags from deterministic gates? → respect their caps
+
+4. **Gate → Cap → Tier**:
 
    **Gap caps (hit = hard ceiling, take the lowest):**
    | Gap | Cap |
    |---|---|
    | JD requires senior/lead/principal/staff level, or experience years far exceed profile | **≤50** |
+   | Profile gap gate triggered (JD requires tool stack profile completely lacks) | **≤ cap from gate flag** |
    | Missing JD's must-have core stack (profile lacks corresponding depth) | **≤55** |
    | Staffing agency / mass-posted consulting intermediary | **≤58** |
 
@@ -163,18 +173,28 @@ python3 SCRIPTS/pre_gate.py --in /tmp/job-scan-flagged.jsonl --out /tmp/job-scan
    - **60–69**: In-lane but material gaps.
    - **<60**: Multiple gaps, staffing intermediary, or core stack fundamentally mismatched.
 
-4. **Output field contract:**
+### Calibration Rules
+
+The LLM scorer should always read `calibration.jsonl` before scoring. It contains user-specific feedback and corrected scores as few-shot examples. The following are **generic scoring principles** (not user-specific):
+
+- **Senior cap scope**: Senior cap ≤50 applies to role-level expectations (senior/lead title, team ownership), not to years-of-experience requirements for a specific technology.
+- **ML training vs deployment**: JD requiring ML method development (designing/refining models, training on datasets) is a different skill from ML deployment/inference optimization. If profile only covers one side, treat the other as a core stack gap. → ≤55
+- **Swedish JD**: JD written entirely in Swedish without matching lang_gate hard phrases: do not exclude, but deduct ~10 points and note in reason.
+- **Profile gap gate flags**: If `profile_gap_gate.py` has set gate flags (e.g. `control_stack_gate=true`), the JD requires tool stacks the user's profile lacks. Respect the cap specified in the flag unless you have strong evidence the flag is wrong.
+
+5. **Output field contract:**
    - `score`: Integer 0–100
    - `lane`: Must be one of `search_config.json`'s `lanes[].name`, or empty string `""`. Do not invent variants.
    - `reason`: One sentence, **must include both hits AND gaps**.
+   - If job has `control_stack_gate=true` or `staffing_gate=true`, these flags were set by deterministic pre-filters. Respect the implied caps (≤50 and ≤55 respectively) unless you have strong evidence the flag is wrong.
 
-5. **JD language signal**: If JD is written entirely in Swedish (even without matching lang_gate hard phrases) → do not exclude, but deduct ~10 points and note in reason.
+6. **JD language signal**: If JD is written entirely in Swedish (even without matching lang_gate hard phrases) → do not exclude, but deduct ~10 points and note in reason.
 
-6. **maybe_applied signal**: If `maybe_applied=true`, deduct slightly and note in reason.
+7. **maybe_applied signal**: If `maybe_applied=true`, deduct slightly and note in reason.
 
 ### Unattended Mode (score-backlog)
 
-When invoked via `claude -p "/job-scan score-backlog"`:
+When invoked in unattended/headless mode (e.g., from `daily_scan.sh`):
 
 1. Use backlog mode (A) to get pending jobs
 2. Run deterministic gates + LLM scoring
@@ -255,5 +275,9 @@ Next LLM scoring run reads `calibration.jsonl` as few-shot reference to continuo
 - Linux: crontab entry
 
 Runs `scripts/daily_scan.sh` daily at the time set in `preferences.toml` (`schedule.fetch_time`).
-If `schedule.auto_score = true`, auto-invokes `claude -p` to score pending jobs after fetch.
+If `schedule.auto_score = true`, auto-invokes the AI coding agent in headless mode to score pending jobs after fetch.
 Scoring failure does not affect fetch results; pending jobs accumulate until next run.
+
+## Lessons Learned
+
+See `lessons.md` in this directory for operational pitfalls discovered during use.

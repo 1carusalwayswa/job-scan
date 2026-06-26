@@ -15,7 +15,7 @@ import threading
 import time
 import webbrowser
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from config import RESULTS, MD, HTML
 

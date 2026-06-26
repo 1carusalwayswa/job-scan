@@ -12,7 +12,7 @@ if sys.version_info < (3, 11):
 
 import tomllib
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 # Git-tracked assets
 ASSETS_DIR = os.path.join(REPO_ROOT, "assets")

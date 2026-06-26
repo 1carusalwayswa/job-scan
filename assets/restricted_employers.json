@@ -1,5 +1,5 @@
 {
-  "_comment": "国防/涉密机构黑名单：此类机构有明确国籍或安全审查门槛，JD 即便没写信号词也默认排除。公司名按词边界子串匹配（小写）。只收明确涉密的国防机关与中央安全机构，普通 kommun/region/universitet 不入此名单（靠 signal 词按 JD 实写判断）。",
+  "_comment": "Defense/security-cleared employers: roles at these organizations require security clearance or specific citizenship that may exclude non-EU applicants. Company names are matched as lowercase substring with word boundaries. Only includes confirmed defense/security agencies, not general government bodies.",
   "company_patterns": [
     "saab",
     "försvarets radioanstalt",
