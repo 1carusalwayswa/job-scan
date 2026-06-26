@@ -31,6 +31,26 @@ exclude_occupation_groups = [
     "IT-chef",
 ]
 
+# Profile gap gate: flag JDs requiring tool stacks your profile lacks.
+# Each group defines regex patterns to match in JD text.
+# If ≥2 patterns from a group match, the job is flagged with gate_key.
+# The LLM scorer sees the flag and applies the cap.
+# Use \\b for word boundaries. Patterns are case-insensitive.
+#
+# Example: if you lack MATLAB/Simulink/CANoe experience:
+# [[gates.profile_gaps.groups]]
+# name = "control_systems"
+# gate_key = "control_stack_gate"
+# cap = 50
+# patterns = ["\\bmatlab\\b", "\\bsimulink\\b", "\\bcanoe\\b", "\\bcapl\\b", "\\bdspace\\b"]
+#
+# Example: if you lack Java/JVM experience:
+# [[gates.profile_gaps.groups]]
+# name = "jvm_stack"
+# gate_key = "jvm_gate"
+# cap = 55
+# patterns = ["\\bjava\\b", "spring boot", "\\bkotlin\\b", "\\bjvm\\b"]
+
 [scoring]
 # Score thresholds per lane — jobs scoring at or above are flagged for review
 # Lane names must match exactly what LLM outputs (defined in search_config.json)

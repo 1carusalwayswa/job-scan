@@ -58,6 +58,23 @@ except: print('$default')
 # --- Phase 1: Fetch ---
 "$PYTHON" "$SCRIPTS_DIR/fetch_jobtech.py" --config "$CONFIG" --out "$RAW"
 
+# Career pages (append to RAW; failures are non-fatal but reported)
+CAREERS_TMP=/tmp/job-scan-careers.jsonl
+COMPANIES="$REPO_DIR/target_companies.json"
+if [ -f "$COMPANIES" ]; then
+    if "$PYTHON" "$SCRIPTS_DIR/fetch_careers.py" --config "$COMPANIES" --out "$CAREERS_TMP" 2>>"$RUNLOG"; then
+        cat "$CAREERS_TMP" >> "$RAW"
+        log "career pages OK"
+    else
+        # Partial results are still written on failure (some companies may have succeeded)
+        if [ -s "$CAREERS_TMP" ]; then
+            cat "$CAREERS_TMP" >> "$RAW"
+        fi
+        log "career pages: some companies failed (see log above)"
+        notify "job-scan: some career page fetches failed — check $RUNLOG"
+    fi
+fi
+
 # --- Phase 2: Diff + dedup + gates ---
 "$PYTHON" "$SCRIPTS_DIR/results_io.py" --mode diff --raw "$RAW" --results "$RESULTS" --out "$TOSCORE"
 "$PYTHON" "$SCRIPTS_DIR/dedup.py" --in "$TOSCORE" --tracker "$TRACKER" --out "$FLAGGED"
@@ -68,6 +85,7 @@ except: print('$default')
     "$PYTHON" "$SCRIPTS_DIR/citizenship_gate.py" --in "$FLAGGED" --out "$FLAGGED" 2>>"$RUNLOG"
 [ "$(read_pref gates.staffing_gate true)" = "true" ] && \
     "$PYTHON" "$SCRIPTS_DIR/pre_gate.py" --in "$FLAGGED" --out "$FLAGGED" 2>>"$RUNLOG"
+"$PYTHON" "$SCRIPTS_DIR/profile_gap_gate.py" --in "$FLAGGED" --out "$FLAGGED" 2>>"$RUNLOG"
 
 # --- Phase 3: Merge + render ---
 "$PYTHON" "$SCRIPTS_DIR/results_io.py" --mode merge --scored "$FLAGGED" --seen "$RAW" \
@@ -86,10 +104,22 @@ MAX_BUDGET="$(read_pref schedule.max_budget_usd 1.0)"
 
 if [ "$AUTO_SCORE" = "true" ] && [ "$PENDING_COUNT" -gt 0 ] && command -v claude >/dev/null 2>&1; then
     log "auto-scoring $PENDING_COUNT pending jobs (budget: \$$MAX_BUDGET)"
-    # NOTE: For unattended use (launchd/cron), the user must configure
-    # permission settings to allow Bash and Read tools without prompting,
-    # or run with appropriate flags. See setup instructions.
-    if claude -p "/job-scan score-backlog" \
+    SCORE_PROMPT="$(cat <<PROMPT
+/job-scan score-backlog
+
+IMPORTANT — all paths are pre-resolved and verified by the shell:
+- PLUGIN_ROOT=$REPO_DIR
+- PROFILE=$REPO_DIR/profile.md
+- RESULTS=$RESULTS
+- PENDING=$PENDING ($PENDING_COUNT jobs)
+- CALIBRATION=$REPO_DIR/calibration.jsonl
+- CONFIG=$CONFIG
+- SCRIPTS=$SCRIPTS_DIR
+
+Do NOT check whether profile.md or scripts/ exist — they do. Proceed directly to scoring.
+PROMPT
+)"
+    if claude -p "$SCORE_PROMPT" \
         --plugin-dir "$REPO_DIR" \
         --add-dir "$REPO_DIR" \
         --allowedTools "Bash,Read,Write,Skill" \

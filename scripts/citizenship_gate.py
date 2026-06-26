@@ -20,7 +20,7 @@ import os
 import re
 import sys
 
-SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 RESTRICTED_CONFIG = os.path.join(SKILL_DIR, "assets", "restricted_employers.json")
 
 SIGNAL_PATTERNS = [
