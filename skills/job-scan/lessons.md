@@ -27,4 +27,4 @@ SKILL.md 中的 `PLUGIN_ROOT` = `~/Projects/job-scan/`（即 `scripts/`、`outpu
 
 ## CERN LD positions have nationality restrictions
 
-CERN Limited Duration (LD) contracts are restricted to citizens of CERN Member States or Associate Member States. China is not on the list. A calibration rule (`calibration-rule-cern-ld-nationality`) caps these at ≤15. CERN Fellow/Student programs may not have this restriction — check each posting individually.
+CERN Limited Duration (LD) contracts are restricted to citizens of CERN Member States or Associate Member States. Check whether the user's nationality is on the list. If not, cap at ≤15. CERN Fellow/Student programs may not have this restriction — check each posting individually.
