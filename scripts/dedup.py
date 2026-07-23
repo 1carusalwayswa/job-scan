@@ -36,8 +36,8 @@ def parse_tracker(text):
         if set("".join(cells)) <= set("-: "):  # separator row ---
             continue
         if company_idx is None:  # header not found yet: this line must be it
-            company_idx = _col_index(cells, "company")
-            title_idx = _col_index(cells, "title")
+            company_idx = _col_index(cells, "company", "公司", "företag")
+            title_idx = _col_index(cells, "title", "岗位", "职位", "roll", "tjänst")
             continue  # header row, not data
         if title_idx is None or max(company_idx, title_idx) >= len(cells):
             continue
