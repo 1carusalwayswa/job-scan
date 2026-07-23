@@ -6,7 +6,7 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that fetc
 
 ## Prerequisites
 
-- **Claude Code** CLI (with an active Max plan or API key)
+- **Claude Code** CLI (with an active plan or API key)
 - **Python ≥ 3.11** (uses `tomllib` from the standard library)
 - **macOS** or **Linux** (for automated scheduling)
 
