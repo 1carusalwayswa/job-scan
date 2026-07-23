@@ -31,7 +31,6 @@ if [[ "$OSTYPE" == darwin* ]]; then
 
     # Unload old versions if present
     launchctl unload "$PLIST" 2>/dev/null || true
-    launchctl unload "$HOME/Library/LaunchAgents/com.job-scan.daily.plist" 2>/dev/null || true
 
     cat > "$PLIST" << PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
