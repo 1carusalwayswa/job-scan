@@ -6,6 +6,9 @@ so company-name queries miss results. Always query via occupation-field +
 bilingual keywords + municipality.
 """
 import json
+import shutil
+import ssl
+import subprocess
 import sys
 import time
 import urllib.error
@@ -68,6 +71,47 @@ def normalize_hit(hit):
     }
 
 
+def _curl_get_json(url):
+    """Fetch JSON with curl when Python cannot use the OS certificate store.
+
+    Python installations on Windows may not trust certificates installed only
+    in the Windows certificate store. The bundled curl.exe uses Schannel and
+    keeps TLS verification enabled, so it is a safe fallback for that specific
+    certificate-chain failure.
+    """
+    curl = shutil.which("curl.exe") or shutil.which("curl")
+    if not curl:
+        raise urllib.error.URLError(
+            "TLS certificate verification failed and curl is unavailable"
+        )
+    try:
+        result = subprocess.run(
+            [
+                curl,
+                "--fail",
+                "--silent",
+                "--show-error",
+                "--location",
+                "--max-time",
+                "30",
+                "--header",
+                "accept: application/json",
+                url,
+            ],
+            check=True,
+            capture_output=True,
+            timeout=35,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        detail = getattr(exc, "stderr", b"")
+        if isinstance(detail, bytes):
+            detail = detail.decode("utf-8", errors="replace")
+        raise urllib.error.URLError(
+            f"curl fallback failed: {str(detail).strip() or exc}"
+        ) from exc
+    return json.loads(result.stdout.decode("utf-8"))
+
+
 def _http_get_json(url, retries=3, backoff=2.0):
     """GET JSON with exponential backoff retry on rate-limit/5xx/network errors."""
     for attempt in range(retries):
@@ -80,7 +124,9 @@ def _http_get_json(url, retries=3, backoff=2.0):
                 time.sleep(backoff * (attempt + 1))
                 continue
             raise
-        except urllib.error.URLError:
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLCertVerificationError):
+                return _curl_get_json(url)
             if attempt < retries - 1:
                 time.sleep(backoff * (attempt + 1))
                 continue

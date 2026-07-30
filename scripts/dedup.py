@@ -5,6 +5,7 @@ Historical applications lack links, so matching is by company name + job title.
 This is a soft hint, not a hard filter. Hard dedup is done by results_io via link key.
 """
 import json
+import re
 import sys
 from difflib import SequenceMatcher
 
@@ -19,10 +20,10 @@ def _col_index(cells, *labels):
 
 
 def parse_tracker(text):
-    """Parse {company, title} rows from applications-tracker.md table.
+    """Parse {company, title} entries from a Markdown application tracker.
 
-    Locates company/title columns by header labels, supporting both
-    date-first tables (date|company|title|...) and simple company|title tables.
+    Supports both Markdown tables and repeated ``- Company:`` / ``- Role:``
+    fields, which are common in longer application journals.
     """
     rows = []
     company_idx = title_idx = None
@@ -37,11 +38,34 @@ def parse_tracker(text):
             continue
         if company_idx is None:  # header not found yet: this line must be it
             company_idx = _col_index(cells, "company", "公司", "företag")
-            title_idx = _col_index(cells, "title", "岗位", "职位", "roll", "tjänst")
+            title_idx = _col_index(
+                cells, "title", "role", "岗位", "职位", "roll", "tjänst"
+            )
             continue  # header row, not data
         if title_idx is None or max(company_idx, title_idx) >= len(cells):
             continue
         rows.append({"company": cells[company_idx], "title": cells[title_idx]})
+
+    current_company = None
+    company_field = re.compile(
+        r"^-\s*(?:company|公司|företag)\s*:\s*(.+?)\s*$", re.IGNORECASE
+    )
+    title_field = re.compile(
+        r"^-\s*(?:title|role|岗位|职位|roll|tjänst)\s*:\s*(.+?)\s*$",
+        re.IGNORECASE,
+    )
+    for line in text.splitlines():
+        stripped = line.strip()
+        company_match = company_field.match(stripped)
+        if company_match:
+            current_company = company_match.group(1)
+            continue
+        title_match = title_field.match(stripped)
+        if title_match and current_company:
+            rows.append(
+                {"company": current_company, "title": title_match.group(1)}
+            )
+            current_company = None
     return rows
 
 
