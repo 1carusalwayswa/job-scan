@@ -31,6 +31,12 @@ def esc(s):
     return html.escape(str(s or ""))
 
 
+def safe_href(link):
+    """Only allow http(s) links to be rendered as clickable — scraped career
+    pages are untrusted and could contain a javascript: URI."""
+    return link if link.startswith(("http://", "https://")) else ""
+
+
 def score_color(s):
     s = s or 0
     if s >= 80: return "#dc2626"
@@ -95,6 +101,7 @@ def render(src, out):
         loc = r.get("location") or ""
         applied = ' <span class="flag">maybe applied</span>' if r.get("maybe_applied") else ""
         link = r.get("link", "")
+        href = safe_href(link)
         risks = risk_flags(r)
         risk_html = f'<div class="risk">⚠ {esc(" · ".join(risks))}</div>' if risks else ""
         btns = "".join(
@@ -110,7 +117,7 @@ def render(src, out):
 <td class="loc">{esc(loc)}</td>
 <td class="reason">{risk_html}{esc(r.get('reason',''))}</td>
 <td><span class="status" style="color:{sfg};background:{sbg}">{esc(status)}</span>{applied}</td>
-<td><a href="{esc(link)}" target="_blank">↗</a></td>
+<td>{f'<a href="{esc(href)}" target="_blank">↗</a>' if href else ''}</td>
 <td class="acts">{btns}</td>
 </tr>""")
 
