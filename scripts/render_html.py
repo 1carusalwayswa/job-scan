@@ -10,6 +10,7 @@ import html
 import json
 import os
 import sys
+from urllib.parse import urlsplit
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
@@ -34,7 +35,17 @@ def esc(s):
 def safe_href(link):
     """Only allow http(s) links to be rendered as clickable — scraped career
     pages are untrusted and could contain a javascript: URI."""
-    return link if link.startswith(("http://", "https://")) else ""
+    if not isinstance(link, str):
+        return ""
+    try:
+        parsed = urlsplit(link)
+    except ValueError:
+        return ""
+    if parsed.scheme.lower() not in ("http", "https"):
+        return ""
+    if not parsed.hostname:
+        return ""
+    return link
 
 
 def score_color(s):
