@@ -10,6 +10,7 @@ import html
 import json
 import os
 import sys
+from urllib.parse import urlsplit
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
@@ -29,6 +30,22 @@ STATUS_BADGE = {
 
 def esc(s):
     return html.escape(str(s or ""))
+
+
+def safe_href(link):
+    """Only allow http(s) links to be rendered as clickable — scraped career
+    pages are untrusted and could contain a javascript: URI."""
+    if not isinstance(link, str):
+        return ""
+    try:
+        parsed = urlsplit(link)
+    except ValueError:
+        return ""
+    if parsed.scheme.lower() not in ("http", "https"):
+        return ""
+    if not parsed.hostname:
+        return ""
+    return link
 
 
 def score_color(s):
@@ -95,6 +112,7 @@ def render(src, out):
         loc = r.get("location") or ""
         applied = ' <span class="flag">maybe applied</span>' if r.get("maybe_applied") else ""
         link = r.get("link", "")
+        href = safe_href(link)
         risks = risk_flags(r)
         risk_html = f'<div class="risk">⚠ {esc(" · ".join(risks))}</div>' if risks else ""
         btns = "".join(
@@ -110,7 +128,7 @@ def render(src, out):
 <td class="loc">{esc(loc)}</td>
 <td class="reason">{risk_html}{esc(r.get('reason',''))}</td>
 <td><span class="status" style="color:{sfg};background:{sbg}">{esc(status)}</span>{applied}</td>
-<td><a href="{esc(link)}" target="_blank">↗</a></td>
+<td>{f'<a href="{esc(href)}" target="_blank">↗</a>' if href else ''}</td>
 <td class="acts">{btns}</td>
 </tr>""")
 
