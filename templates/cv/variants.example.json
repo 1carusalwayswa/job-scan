@@ -1,0 +1,14 @@
+{
+  "default": "ml",
+  "lanes": {
+    "ML / AI Engineer": "ml",
+    "Software Developer": "backend",
+    "Data Engineer": "data"
+  },
+  "variants": {
+    "ml": "ML / AI engineer — applied ML, LLM applications, research-heavy roles",
+    "backend": "Backend developer — services, REST APIs, databases",
+    "fullstack": "Full-stack engineer — frontend + backend product work",
+    "data": "Data engineer / analyst — pipelines, SQL, analytics"
+  }
+}

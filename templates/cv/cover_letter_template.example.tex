@@ -1,0 +1,31 @@
+% Cover letter template — copy to cv/cover_letter_template.tex and fill in your header.
+% The @PLACEHOLDERS@ below the header are filled per job by the skill (Phase 5.4).
+% Self-contained (no CV class needed); compiles with Tectonic / pdfLaTeX.
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{raleway}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{8pt}
+\pagestyle{empty}
+
+\begin{document}
+
+{\fontsize{20}{20}\selectfont\textbf{YOUR NAME}}\\[4pt]
+{\small City \textperiodcentered{} +00 000 000 \textperiodcentered{}
+\href{mailto:you@example.com}{you@example.com} \textperiodcentered{}
+\href{https://github.com/your-handle}{GitHub}}
+
+\vspace{10pt}
+@DATE@ \\
+@COMPANY@ — @ROLE@
+
+@BODY@
+
+@CLOSING@\\
+YOUR NAME
+
+\end{document}

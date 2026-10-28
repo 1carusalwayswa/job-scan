@@ -15,3 +15,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Personal CV sources (base variants, transcript, LaTeX class)
+/cv/

@@ -67,3 +67,12 @@ fetch_time = "07:00"
 auto_score = true
 # Max budget per auto-scoring run (USD)
 max_budget_usd = 1.0
+
+[apply]
+# Usage cap per dashboard CV / cover-letter generation (USD-equivalent; on a
+# claude.ai subscription this counts against plan usage, not billed separately)
+max_budget_usd = 3.0
+# Where per-job folders (tailored CV, cover letter, PDFs) are saved — not under ~/.claude
+output_dir = "~/Desktop/job-applications"
+# PDF file names: <pdf_name>_CV.pdf / <pdf_name>_Cover_Letter.pdf
+pdf_name = "Your_Name"

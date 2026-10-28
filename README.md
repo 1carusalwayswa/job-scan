@@ -63,6 +63,45 @@ python3 scripts/review_server.py   # http://localhost:8765
 ```
 Or directly open `output/job-scan-results.html` in a browser.
 
+### Tailored CV & cover letter (per job)
+
+Turn a recommended job into a CV tailored to its JD — from your own LaTeX CV — and, if you want, a cover letter. Both come out as PDFs you review and upload yourself; nothing is ever submitted for you.
+
+One-time setup (everything in `cv/` is personal and gitignored):
+
+```
+cv/base/<variant>.tex          # your LaTeX CV(s), one per role type (e.g. ml.tex, backend.tex)
+cv/template/                   # class/style files they need (e.g. developercv.cls)
+cv/variants.json               # lane -> variant; start from templates/cv/variants.example.json
+cv/cover_letter_template.tex   # start from templates/cv/cover_letter_template.example.tex
+cv/transcript.md               # optional: courses + grades for "relevant coursework"
+cv/claims_to_confirm.md        # optional: statements the tailoring must not spread
+```
+
+PDFs are compiled locally with [Tectonic](https://tectonic-typesetting.github.io/) (`brew install tectonic`).
+
+Then, either:
+- **Dashboard:** `python3 scripts/review_server.py` → each job has **Tailor CV** and **Cover letter** buttons. Generation runs headless (`claude -p`) in ~1–3 min; the row then links the PDFs.
+- **Chat:** "Tailor CV for #3", "Prepare the top 5", "Write a cover letter for #3".
+- **CLI:** `prep_apply.py --top 5 --cv` (job folders + base CV), `prep_apply.py --build <dir>` (diff, PDFs, Overleaf zip).
+
+Each job gets a folder in `[apply].output_dir` (default `~/Desktop/job-applications/`):
+
+```
+<company-title>/
+  <pdf_name>_CV.pdf              # ready to upload
+  <pdf_name>_Cover_Letter.pdf    # only if requested
+  cover_letter.md                # plain text for application forms
+  jd_match.md                    # JD requirement -> evidence -> hit/gap, interview prep
+  cv.tex, cv_base.tex, changes.diff, overleaf.zip
+```
+
+How tailoring works:
+- The base variant is picked from the job's lane, then rewritten for the JD: summary, skill order, bullet choice and wording, project order — using only facts from `profile.md`, your base CVs and transcript. Missing skills go into `jd_match.md` as interview prep, never onto the CV.
+- Page count is checked against the base; LaTeX errors get one automatic repair pass.
+- The headless run is sandboxed because the JD is untrusted text: it can read files and edit only that job's folder, with no shell and no web access. Packaging and compiling are done by the server, and the server only accepts same-origin JSON requests.
+- The output folder must be outside `~/.claude/`, since headless Claude Code refuses to write there.
+
 ## Project Structure
 
 ```
@@ -80,13 +119,15 @@ scripts/
   pre_gate.py                 — Staffing company + occupation group gate
   render_html.py              — HTML dashboard renderer
   review_server.py            — Local HTTP server for status updates
-  prep_apply.py               — Prepare application directories
+  prep_apply.py               — Prepare application dirs, base CV copy, build (diff/PDF/zip)
+  apply_docs.py               — Headless CV / cover-letter generation for dashboard buttons
 assets/
   staffing_companies.json     — Known staffing/temp agency patterns
   restricted_employers.json   — Security-cleared employer patterns
 templates/
   profile.example.md          — Example candidate profile
   preferences.example.toml    — Example preferences with all options
+  cv/                         — Examples for the CV-tailoring setup (variants, cover letter)
 ```
 
 User-generated files (gitignored):
@@ -97,6 +138,7 @@ search_config.json            — Your search lanes and keywords
 target_companies.json         — Your target company career pages
 output/                       — Results (JSONL, Markdown, HTML)
 calibration.jsonl             — Scoring feedback for continuous improvement
+cv/                           — Your base CVs, LaTeX class, cover-letter template
 ```
 
 ## Scoring Methodology

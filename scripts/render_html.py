@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from config import RESULTS, HTML
+import apply_docs
 
 PALETTE = [
     "#2563eb", "#7c3aed", "#059669", "#c2410c", "#0891b2",
@@ -88,6 +89,22 @@ def _is_gated(r):
     return any(r.get(g) for g in ("lang_gate", "citizenship_gate", "staffing_gate", "occupation_gate"))
 
 
+DOC_LABELS = (("cv", "CV"), ("cover_letter", "Cover letter"))
+
+
+def docs_html(st):
+    """Download links + generation state for one job (mirrors docLinks() in the page JS)."""
+    base = "/files/" + esc(st["dir"]) + "/"
+    parts = [f'<a href="{base}{f}" target="_blank">{f}</a>' for f in st["files"]]
+    for kind, label in DOC_LABELS:
+        state = st[kind].get("state")
+        if state == "running":
+            parts.append(f'<span class="gen">{label} generating…</span>')
+        elif state == "failed":
+            parts.append(f'<span class="genfail">{label} failed (see {kind}.log)</span>')
+    return " · ".join(parts)
+
+
 def render(src, out):
     all_rows = [json.loads(l) for l in open(src, encoding="utf-8") if l.strip()]
     n_ignored = sum(1 for r in all_rows if r.get("status") == "ignored")
@@ -119,7 +136,13 @@ def render(src, out):
             f'<button class="act" onclick="mark(this,\'{s}\')"{" disabled" if status == s else ""}>{label}</button>'
             for s, label in (("applied", "Applied"), ("rejected", "Rejected"), ("reviewed", "Reviewed"), ("ignored", "Ignore"))
         )
-        trs.append(f"""<tr data-link="{esc(link)}">
+        btns += ('<br><button class="doc" onclick="genDoc(this,\'cv\')">Tailor CV</button>'
+                 '<button class="doc" onclick="genDoc(this,\'cover_letter\')">Cover letter</button>')
+        st = apply_docs.status_for_row(r)
+        running = any(st[k].get("state") == "running" for k, _ in DOC_LABELS)
+        has_cv = "1" if "cv.tex" in st["files"] else "0"
+        btns += f'<div class="docs" data-hascv="{has_cv}">{docs_html(st)}</div>'
+        trs.append(f"""<tr data-link="{esc(link)}" data-running="{int(running)}">
 <td class="num">{i}</td>
 <td class="score" style="color:{score_color(sc)}">{esc(sc)}</td>
 <td><span class="lane" style="background:{lc}1a;color:{lc}">{esc(lane)}</span></td>
@@ -172,6 +195,10 @@ a {{ color:#2563eb; text-decoration:none; font-size:16px; }}
 .act {{ border:1px solid #cbd5e1; background:#fff; border-radius:6px; padding:3px 8px; font-size:12px; cursor:pointer; margin-right:4px; }}
 .act:hover:not(:disabled) {{ background:#f1f5f9; }}
 .act:disabled {{ opacity:.35; cursor:default; }}
+.doc {{ border:1px solid #6366f1; color:#4338ca; background:#eef2ff; border-radius:6px; padding:3px 8px; font-size:12px; cursor:pointer; margin:4px 4px 0 0; }}
+.doc:disabled {{ opacity:.4; cursor:default; }}
+.docs {{ font-size:11px; margin-top:4px; white-space:normal; max-width:260px; }}
+.gen {{ color:#4338ca; }} .genfail {{ color:#b91c1c; }}
 #toast {{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:8px 16px; border-radius:8px; font-size:13px; display:none; z-index:99; }}
 </style></head>
 <body>
@@ -189,7 +216,7 @@ a {{ color:#2563eb; text-decoration:none; font-size:16px; }}
 <div class="controls">
 <button data-f="all" class="active" onclick="flt(this)">All</button>
 <button data-f="shortlisted" onclick="flt(this)">Shortlisted</button>
-<button data-f="unprocessed" onclick="flt(this)">未处理</button>
+<button data-f="unprocessed" onclick="flt(this)">Unprocessed</button>
 <button data-f="hi" onclick="flt(this)">≥70 pts</button>
 </div>
 </header>
@@ -241,6 +268,49 @@ async function mark(btn,status){{
     toast('Marked: '+status);
   }}catch(e){{ btn.disabled=false; toast('Failed: '+e.message); }}
 }}
+const DOC_LABELS=[['cv','CV'],['cover_letter','Cover letter']];
+function docLinks(st){{
+  const base='/files/'+encodeURIComponent(st.dir)+'/';
+  const parts=st.files.map(f=>'<a href="'+base+f+'" target="_blank">'+f+'</a>');
+  for(const [k,label] of DOC_LABELS){{
+    if(st[k].state==='running') parts.push('<span class="gen">'+label+' generating…</span>');
+    else if(st[k].state==='failed') parts.push('<span class="genfail">'+label+' failed (see '+k+'.log)</span>');
+  }}
+  return parts.join(' · ');
+}}
+async function pollDoc(tr){{
+  const box=tr.querySelector('.docs');
+  const res=await fetch('/api/doc-status?link='+encodeURIComponent(tr.dataset.link));
+  if(!res.ok) return;
+  const st=await res.json();
+  box.innerHTML=docLinks(st);
+  box.dataset.hascv=st.files.includes('cv.tex')?'1':'0';
+  const running=DOC_LABELS.some(([k])=>st[k].state==='running');
+  tr.querySelectorAll('.doc').forEach(b=>b.disabled=running);
+  if(running) setTimeout(()=>pollDoc(tr),5000);
+  else if(tr.dataset.running==='1') toast('Finished: '+(tr.querySelector('.company').textContent));
+  tr.dataset.running=running?'1':'0';
+}}
+async function genDoc(btn,kind){{
+  const tr=btn.closest('tr'), link=tr.dataset.link, box=tr.querySelector('.docs');
+  if(location.protocol==='file:'){{ toast('file:// mode cannot generate — open via review server instead'); return; }}
+  let force=false;
+  if(kind==='cv'&&box.dataset.hascv==='1'){{
+    if(!confirm('This job already has a cv.tex. Regenerating starts again from the base CV and overwrites any manual edits. Continue?')) return;
+    force=true;
+  }}
+  tr.querySelectorAll('.doc').forEach(b=>b.disabled=true);
+  try{{
+    const res=await fetch('/api/doc',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{link,kind,force}})}});
+    const st=await res.json();
+    if(!res.ok) throw new Error(st.error||res.status);
+    box.innerHTML=docLinks(st);
+    tr.dataset.running='1';
+    toast('Generating… about 1–3 minutes');
+    setTimeout(()=>pollDoc(tr),5000);
+  }}catch(e){{ tr.querySelectorAll('.doc').forEach(b=>b.disabled=false); toast('Failed: '+e.message); }}
+}}
+if(location.protocol!=='file:') document.querySelectorAll('tr[data-running="1"]').forEach(pollDoc);
 </script>
 <div id="toast"></div>
 </body></html>"""

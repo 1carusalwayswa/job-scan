@@ -32,6 +32,29 @@ MD = os.path.join(OUTPUT_DIR, "job-scan-results.md")
 HTML = os.path.join(OUTPUT_DIR, "job-scan-results.html")
 TRACKER = os.path.join(OUTPUT_DIR, "applications-tracker.md")
 
+# CV tailoring (personal, gitignored)
+CV_DIR = os.path.join(REPO_ROOT, "cv")
+CV_BASE_DIR = os.path.join(CV_DIR, "base")
+CV_TEMPLATE_DIR = os.path.join(CV_DIR, "template")
+CV_VARIANTS = os.path.join(CV_DIR, "variants.json")
+
+
+def _apply_pref(key, default):
+    """Read [apply].<key> from preferences.toml (paths below are needed at import time)."""
+    try:
+        with open(PREFERENCES, "rb") as f:
+            return tomllib.load(f).get("apply", {}).get(key, default)
+    except (OSError, tomllib.TOMLDecodeError):
+        return default
+
+
+# Per-job folders (job_summary, tailored cv.tex, PDFs). Keep it outside ~/.claude:
+# headless Claude Code refuses to write there.
+APPLICATIONS_DIR = os.path.expanduser(_apply_pref("output_dir", "~/Desktop/job-applications"))
+PDF_NAME = _apply_pref("pdf_name", "Application")
+CV_PDF = f"{PDF_NAME}_CV.pdf"
+LETTER_PDF = f"{PDF_NAME}_Cover_Letter.pdf"
+
 # Calibration feedback
 CALIBRATION = os.path.join(REPO_ROOT, "calibration.jsonl")
 
